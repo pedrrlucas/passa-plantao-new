@@ -2105,6 +2105,7 @@
             currentShiftCompletedExams = [];
             currentCustomDevices = [];
             originalPatientDevices = [];
+            clearAllMonitoringValidationErrors();
 
             safeClear('diagnoses-tags-container');
             safeClear('comorbidities-tags-container');
@@ -2331,6 +2332,109 @@
                 toast.classList.add('hidden');
             }, duration);
         };
+
+        /**
+         * Verifica se há algum campo de input com erro de validação no formulário.
+         * @returns {boolean} - Retorna true se encontrar algum erro, caso contrário, false.
+         */
+        function checkForInvalidInputs() {
+            // Procura por qualquer input que ainda tenha a classe de erro
+            const invalidInput = document.querySelector('#module-monitoramento .monitoring-input.has-error');
+            return invalidInput !== null;
+        }
+
+        /**
+         * Limpa o estado de erro de um campo de input e seu display associado.
+         * @param {HTMLElement} inputElement - O elemento de input a ser limpo.
+         */
+        const clearValidationError = (inputElement) => {
+            inputElement.classList.remove('has-error');
+            const displayArea = inputElement.closest('.clickable-item-area').querySelector('.monitoring-display-area');
+            if(displayArea) {
+                displayArea.classList.remove('has-error');
+            }
+            const errorMessageElement = inputElement.nextElementSibling;
+            if (errorMessageElement && errorMessageElement.classList.contains('input-error-message')) {
+                errorMessageElement.classList.remove('is-visible');
+                errorMessageElement.textContent = '';
+            }
+        };
+
+        /**
+         * Exibe uma mensagem de validação inline quando o input está aberto.
+         * @param {HTMLElement} inputElement - O elemento de input que falhou na validação.
+         */
+        const showValidationError = (inputElement) => {
+            inputElement.classList.add('has-error');
+            const errorMessageElement = inputElement.nextElementSibling;
+            if (errorMessageElement && errorMessageElement.classList.contains('input-error-message')) {
+                errorMessageElement.textContent = 'Valor inválido'; // Mensagem padronizada
+                errorMessageElement.classList.add('is-visible');
+            }
+        };
+        
+        /**
+         * Remove todos os indicadores de erro (bordas, mensagens e ícones)
+         * do módulo de monitoramento.
+         */
+        function clearAllMonitoringValidationErrors() {
+            const module = document.getElementById('module-monitoramento');
+            if (!module) return;
+
+            // Remove a classe de erro de todos os inputs
+            module.querySelectorAll('.monitoring-input.has-error').forEach(input => {
+                input.classList.remove('has-error');
+            });
+
+            // Remove a classe de erro de todas as áreas de display
+            module.querySelectorAll('.monitoring-display-area.has-error').forEach(display => {
+                display.classList.remove('has-error');
+            });
+
+            // Esconde todas as mensagens de erro de texto
+            module.querySelectorAll('.input-error-message.is-visible').forEach(msg => {
+                msg.classList.remove('is-visible');
+                msg.textContent = '';
+            });
+        }
+
+
+        /**
+         * Aplica máscaras e validações aos campos do formulário.
+         */
+        function applyInputMasksAndValidation() {
+            // Máscara para nomes
+            const nameInputs = document.querySelectorAll('input[id*="patient-name"], input[id*="register-name"]');
+            nameInputs.forEach(input => {
+                IMask(input, { mask: /^[a-zA-Z\sçÇãõâêôáéíóúÁÉÍÓÚÀà.`']+$/ });
+            });
+
+            // Validação para campos de monitoramento
+            const setupValidation = (elementId, min, max) => {
+                const input = document.getElementById(elementId);
+                if (input) {
+                    input.addEventListener('input', () => clearValidationError(input));
+                    input.addEventListener('blur', () => {
+                        clearValidationError(input);
+                        const valueStr = input.value.replace(',', '.').trim();
+                        if (valueStr === '') return;
+
+                        const value = parseFloat(valueStr);
+                        if (isNaN(value) || value < min || value > max) {
+                            showValidationError(input);
+                        }
+                    });
+                }
+            };
+            
+            // Intervalos de monitoramento expandidos
+            setupValidation('form-sv-pa', 0, 400);
+            setupValidation('form-sv-fc', 0, 400);
+            setupValidation('form-sv-fr', 0, 150);
+            setupValidation('form-sv-sato2', 0, 100);
+            setupValidation('form-sv-temp', 25, 50);
+            setupValidation('form-sv-hgt', 0, 1500);
+        }
 
         // Função para definir o modo de visualização e atualizar a UI
         const setViewMode = (mode) => {
@@ -3485,6 +3589,8 @@
         // Abre/Fecha o modal de adicionar paciente
         addPatientButton.addEventListener('click', () => {
             addPatientModal.classList.remove('hidden');
+            // Aplica as máscaras nos campos do modal que acabou de abrir
+            applyInputMasksAndValidation();
         });
         closeModalButton.addEventListener('click', () => {
             addPatientModal.classList.add('hidden');
@@ -4316,24 +4422,24 @@
         // Função para finalizar a edição de um campo de monitoramento
         function finishMonitoringInputEdit(inputElement) {
             const value = inputElement.value.trim();
-            const wrapper = inputElement.closest('.clickable-item-area'); // Procura o pai mais próximo
-            
-            // Verificação de segurança: se não encontrar o wrapper, interrompe a execução
-            if (!wrapper) {
-                console.error("Não foi possível encontrar o contêiner '.clickable-item-area' para o input.", inputElement);
-                return;
-            }
+            const wrapper = inputElement.closest('.clickable-item-area');
+            if (!wrapper) return;
 
             const displayArea = wrapper.querySelector('.monitoring-display-area');
 
             if (displayArea) {
                 displayArea.textContent = value;
-                displayArea.classList.remove('hidden'); // Mostra a área de texto novamente
+                // LÓGICA DO ÍCONE DE ERRO
+                if (inputElement.classList.contains('has-error')) {
+                    displayArea.classList.add('has-error');
+                } else {
+                    displayArea.classList.remove('has-error');
+                }
+                displayArea.classList.remove('hidden');
             }
 
-            inputElement.classList.add('hidden'); // Esconde o campo de input
+            inputElement.classList.add('hidden');
 
-            // Se o valor mudou, marca como "não salvo" e atualiza os scores
             if (inputElement.value !== (inputElement.dataset.originalValue || '')) {
                 setUnsavedChanges(true);
                 updateLiveScores();
@@ -4356,6 +4462,10 @@
 
         addHandoversForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (checkForInvalidInputs()) {
+                showToast("Corrija os valores inválidos no monitoramento antes de salvar.", 3500);
+                return; // Impede o restante da função de ser executado
+            }
 
             const submitButton = e.target.querySelector('button[type="submit"]');
             submitButton.disabled = true;
@@ -6410,6 +6520,8 @@
             
             // Garante que o modal está visível
             editPatientModal.classList.remove('hidden');
+            // Aplica as máscaras nos campos do modal de edição
+            applyInputMasksAndValidation();
         }
 
         function filterPatients() {
@@ -7818,6 +7930,7 @@
             if (medicationsListContainer) medicationsListContainer.innerHTML = '';
             currentMedications = []; // Limpa o array de estado das medicações
             showMedicationEditor(false); // Garante que o editor de medicação esteja fechado
+            clearAllMonitoringValidationErrors();
 
             // 3. Limpa o módulo de Monitoramento (reutilizando a função que já existe)
             resetMonitoringModule();
@@ -8396,6 +8509,8 @@
         window.addEventListener('click', () => {
             document.querySelectorAll('.dropdown-menu').forEach(menu => menu.classList.add('hidden'));
         });
+        // Chama a função para aplicar as máscaras e validações
+        applyInputMasksAndValidation();
 
         // Seleciona os elementos necessários: o botão, a área de busca e o card do módulo.
         const addNewMedicationBtn = document.getElementById('add-new-medication-btn');
