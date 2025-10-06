@@ -22,7 +22,11 @@
     <!--Bibliioteca de Gráficos-->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- Ícones -->
     <link rel="stylesheet" href="styles/main.css">
+
+    <!-- Máscara de Input -->
+    <script src="https://unpkg.com/imask"></script>
 
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -604,48 +608,90 @@
                                     <div class="item-section-wrapper">
                                         <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
                                             <label class="block text-xs font-semibold text-gray-800 mb-1">PA (mmHg)</label>
-                                            <div class="monitoring-display-area"></div>
+                                            <div class="flex items-center"> <div class="monitoring-display-area"></div>
+                                                <span class="monitoring-error-icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </span>
+                                            </div>
                                             <input type="text" id="form-sv-pa" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 120/80" data-validate="pressure">
+                                            <span class="input-error-message"></span>
                                         </div>
                                     </div>
 
                                     <div class="item-section-wrapper">
                                         <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
                                             <label class="block text-xs font-semibold text-gray-800 mb-1">FC (bpm)</label>
-                                            <div class="monitoring-display-area"></div>
+                                            <div class="flex items-center"> <div class="monitoring-display-area"></div>
+                                                <span class="monitoring-error-icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </span>
+                                            </div>
                                             <input type="text" id="form-sv-fc" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 75" data-validate="numeric">
+                                            <span class="input-error-message"></span>
                                         </div>
                                     </div>
 
                                     <div class="item-section-wrapper">
                                         <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
                                             <label class="block text-xs font-semibold text-gray-800 mb-1">FR (irpm)</label>
-                                            <div class="monitoring-display-area"></div>
+                                            <div class="flex items-center"> <div class="monitoring-display-area"></div>
+                                                <span class="monitoring-error-icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </span>
+                                            </div>
                                             <input type="text" id="form-sv-fr" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 16" data-validate="numeric">
+                                            <span class="input-error-message"></span>
                                         </div>
                                     </div>
 
                                     <div class="item-section-wrapper">
                                         <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
                                             <label class="block text-xs font-semibold text-gray-800 mb-1">SatO₂ (%)</label>
-                                            <div class="monitoring-display-area"></div>
+                                            <div class="flex items-center"> <div class="monitoring-display-area"></div>
+                                                <span class="monitoring-error-icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </span>
+                                            </div>
                                             <input type="text" id="form-sv-sato2" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 98" data-validate="numeric">
+                                            <span class="input-error-message"></span>
                                         </div>
                                     </div>
 
                                     <div class="item-section-wrapper">
                                         <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
                                             <label class="block text-xs font-semibold text-gray-800 mb-1">Temp (°C)</label>
-                                            <div class="monitoring-display-area"></div>
+                                            <div class="flex items-center"> <div class="monitoring-display-area"></div>
+                                                <span class="monitoring-error-icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </span>
+                                            </div>
                                             <input type="text" id="form-sv-temp" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 36.5" data-validate="decimal">
+                                            <span class="input-error-message"></span>
                                         </div>
                                     </div>
 
                                     <div class="item-section-wrapper">
                                         <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
                                             <label class="block text-xs font-semibold text-gray-800 mb-1">HGT (mg/dL)</label>
-                                            <div class="monitoring-display-area"></div>
+                                            <div class="flex items-center"> <div class="monitoring-display-area"></div>
+                                                <span class="monitoring-error-icon">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                                    </svg>
+                                                </span>
+                                            </div>
                                             <input type="text" id="form-sv-hgt" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 95" data-validate="numeric">
+                                            <span class="input-error-message"></span>
                                         </div>
                                     </div>
                                     
