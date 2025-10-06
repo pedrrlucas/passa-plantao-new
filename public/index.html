@@ -1088,20 +1088,28 @@
                 </div>
                 <form id="add-patient-form" class="space-y-5" autocomplete="off">
                     <div>
-                        <label for="new-patient-name" class="block text-sm font-medium text-gray-700">Nome Completo</label>
-                        <input id="new-patient-name" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Digite o nome completo do paciente">
+                        <label for="new-patient-name" class="block text-sm font-medium leading-6 text-gray-900">Nome Completo</label>
+                        <div class="mt-2">
+                            <input id="new-patient-name" type="text" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Digite o nome completo do paciente">
+                        </div>
                     </div>
                     <div>
-                        <label for="new-patient-dob" class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
-                        <input id="new-patient-dob" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Selecione a data">
+                        <label for="new-patient-dob" class="block text-sm font-medium leading-6 text-gray-900">Data de Nascimento</label>
+                        <div class="mt-2">
+                            <input id="new-patient-dob" type="text" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Selecione a data">
+                        </div>
                     </div>
                     <div>
-                        <label for="new-patient-number" class="block text-sm font-medium text-gray-700">Nº do Prontuário</label>
-                        <input id="new-patient-number" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Digite o número do prontuário">
+                        <label for="new-patient-number" class="block text-sm font-medium leading-6 text-gray-900">Nº do Prontuário</label>
+                        <div class="mt-2">
+                            <input id="new-patient-number" type="number" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Digite o número do prontuário">
+                        </div>
                     </div>
                     <div>
-                        <label for="new-patient-room" class="block text-sm font-medium text-gray-700">Nº do Leito/Sala</label>
-                        <input id="new-patient-room" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Digite o número do leito">
+                        <label for="new-patient-room" class="block text-sm font-medium leading-6 text-gray-900">Nº do Leito/Sala</label>
+                        <div class="mt-2">
+                            <input id="new-patient-room" type="number" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Digite o número do leito">
+                        </div>
                     </div>
                     <div class="flex justify-end pt-4">
                         <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Salvar Paciente</button>
@@ -1124,25 +1132,35 @@
                     <input type="hidden" id="edit-patient-id">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium">Nome Completo</label>
-                            <input id="edit-patient-name" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            <label for="edit-patient-name" class="block text-sm font-medium leading-6 text-gray-900">Nome Completo</label>
+                            <div class="mt-2">
+                                <input id="edit-patient-name" type="text" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium">Data de Nascimento</label>
-                            <input id="edit-patient-dob" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="dd/mm/aaaa">
+                            <label for="edit-patient-dob" class="block text-sm font-medium leading-6 text-gray-900">Data de Nascimento</label>
+                            <div class="mt-2">
+                                <input id="edit-patient-dob" type="text" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="dd/mm/aaaa">
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium">Nº do Prontuário</label>
-                            <input id="edit-patient-number" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            <label for="edit-patient-number" class="block text-sm font-medium leading-6 text-gray-900">Nº do Prontuário</label>
+                            <div class="mt-2">
+                                <input id="edit-patient-number" type="number" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium">Nº do Leito/Sala</label>
-                            <input id="edit-patient-room" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            <label for="edit-patient-room" class="block text-sm font-medium leading-6 text-gray-900">Nº do Leito/Sala</label>
+                            <div class="mt-2">
+                                <input id="edit-patient-room" type="number" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
+                            </div>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium">Justificativa da Correção / Adendo</label>
-                        <textarea id="edit-patient-justification" required rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="Ex: Correção de erro de digitação no prontuário."></textarea>
+                        <label for="edit-patient-justification" class="block text-sm font-medium leading-6 text-gray-900">Justificativa da Correção / Adendo</label>
+                        <div class="mt-2">
+                            <textarea id="edit-patient-justification" required rows="3" class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Ex: Correção de erro de digitação no prontuário."></textarea>
+                        </div>
                     </div>
                     <div class="flex justify-end pt-4">
                         <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Salvar Correção</button>
