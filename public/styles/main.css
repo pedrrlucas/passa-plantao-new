@@ -1023,6 +1023,44 @@
         .sound-wave:nth-child(4) {
             animation-delay: -0.9s;
         }
+        
+        /* --- ESTILOS PARA VALIDAÇÃO DE INPUTS --- */
+        .input-error-message {
+            color: #DC2626; /* Cor text-red-600 do Tailwind */
+            font-size: 0.75rem; /* text-xs */
+            font-weight: 500; /* font-medium */
+            margin-top: 4px;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .input-error-message.is-visible {
+            max-height: 20px; /* Altura suficiente para uma linha de texto */
+            opacity: 1;
+        }
+
+        /* Adiciona uma borda vermelha ao input quando há erro */
+        input.has-error {
+            border-color: #EF4444; /* Cor border-red-500 */
+            box-shadow: 0 0 0 1px #F87171; /* Sombra sutil para destaque */
+        }
+
+        /* Estilo para o ícone de erro ao lado do valor */
+        .monitoring-error-icon {
+            display: none; /* Começa escondido */
+            color: #EF4444; /* Cor red-500 */
+            margin-left: 6px;
+        }
+
+        /* Mostra o ícone quando o display do valor tem erro */
+        .monitoring-display-area.has-error + .monitoring-error-icon {
+            display: inline-block;
+        }
+        .monitoring-display-area.hidden + .monitoring-error-icon {
+            display: none;
+        }
 
         @keyframes sound-wave-animation {
             0%, 40%, 100% {
