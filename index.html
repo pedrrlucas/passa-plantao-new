@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passa Plantão</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fontes do Google -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!--Calendário da Flatpickr-->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/light.css">
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/pt.js"></script>
+
+    <!--Bibliioteca de Gráficos-->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="styles/main.css">
+
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <!-- Container Principal da Aplicação -->
+    <div id="app" class="h-full flex flex-col overflow-hidden">
+
+        <!-- Tela de Carregamento Inicial -->
+        <div id="loading-screen" class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <svg class="animate-spin h-10 w-10 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="mt-4 text-lg font-medium text-gray-600">Carregando Sistema...</p>
+            </div>
+        </div>
+
+        <!-- Tela de Login -->
+        <div id="login-screen" class="hidden flex-grow">
+            <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+                <div class="sm:mx-auto sm:w-full sm:max-w-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto h-12 w-auto text-blue-600"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M8 7h8"/><path d="M8 11h4"/></svg>
+                    <h2 class="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">Acesse sua conta</h2>
+                    <p class="mt-2 text-center text-sm text-gray-600">Sistema de Passagem de Plantão</p>
+                </div>
+
+                <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
+                    <form id="login-form" class="space-y-6">
+                        <div>
+                            <label for="login-email" class="block text-sm font-medium leading-6 text-gray-900">Email</label>
+                            <div class="mt-2">
+                                <input id="login-email" name="email" type="email" autocomplete="email" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <label for="login-password" class="block text-sm font-medium leading-6 text-gray-900">Senha</label>
+                            </div>
+                            <div class="mt-2">
+                                <input id="login-password" name="password" type="password" autocomplete="current-password" required class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
+                            </div>
+                        </div>
+
+                        <div>
+                            <button type="submit" class="flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Entrar</button>
+                        </div>
+                    </form>
+
+                    <p class="mt-10 text-center text-sm text-gray-500">
+                        Não tem uma conta?
+                        <a href="#" id="go-to-register" class="font-semibold leading-6 text-blue-600 hover:text-blue-500">Cadastre-se</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Cadastro -->
+        <div id="register-screen" class="hidden flex-grow">
+            <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+                <div class="sm:mx-auto sm:w-full sm:max-w-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto h-12 w-auto text-blue-600"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+                    <h2 class="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">Crie sua conta</h2>
+                     <p class="mt-2 text-center text-sm text-gray-600">Utilize um e-mail fictício, que não precisa existir, mas ele obrigatoriamente deve terminar com @testeficticio.com (ex: seu.nome@testeficticio.com).</p>
+                </div>
+
+                <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
+                    <form id="register-form" class="space-y-6">
+                        <div>
+                            <label for="register-name" class="block text-sm font-medium leading-6 text-gray-900">Nome Completo</label>
+                            <input id="register-name" type="text" required class="mt-2 block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600">
+                        </div>
+                        <div>
+                            <label for="register-email" class="block text-sm font-medium leading-6 text-gray-900">Email para o Teste</label>
+                            <input id="register-email" type="email" required class="mt-2 block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600">
+                        </div>
+                        <div>
+                            <label for="register-password" class="block text-sm font-medium leading-6 text-gray-900">Senha</label>
+                            <input id="register-password" type="password" required class="mt-2 block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600">
+                        </div>
+                        <div>
+                            <button type="submit" class="flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">Cadastrar</button>
+                        </div>
+                    </form>
+
+                    <p class="mt-10 text-center text-sm text-gray-500">
+                        Já tem uma conta?
+                        <a href="#" id="go-to-login" class="font-semibold leading-6 text-blue-600 hover:text-blue-500">Faça o login</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Área Principal (Dashboard de Pacientes) -->
+        <div id="main-content" class="hidden flex-grow flex flex-col h-full">
+            <!-- Cabeçalho -->
+            <header class="bg-white shadow-sm">
+                <div class="mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex h-16 items-center justify-between">
+                    <div class="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-8 w-auto text-blue-600"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M8 7h8"/><path d="M8 11h4"/></svg>
+                        <span class="ml-3 hidden text-xl font-bold text-gray-800 sm:inline">Passa Plantão</span>
+                    </div>
+                        <div class="flex items-center space-x-4">
+                            <div id="connection-status" class="flex items-center">
+                            </div>
+                            <span id="user-info" class="hidden sm:block text-sm text-gray-600"></span>
+                            
+                            <div class="relative">
+                                <button id="notification-bell-btn" class="relative p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-5-5.917V5a1 1 0 00-2 0v.083A6 6 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                    </svg>
+                                    <span id="notification-indicator" class="hidden absolute top-1 right-1 block h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white"></span>
+                                </button>
+
+                                <div id="notification-panel" class="hidden absolute right-0 mt-2 w-80 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                                    <div class="p-2 border-b">
+                                        <p class="text-sm font-semibold text-gray-800">Notificações</p>
+                                    </div>
+                                    <div id="notification-list" class="max-h-96 overflow-y-auto">
+                                        </div>
+                                </div>
+                            </div>
+                            <button id="logout-button" class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">
+                                Sair
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Conteúdo do Dashboard -->
+            <main class="flex-grow overflow-y-auto min-h-0">
+                <div class="mx-auto py-6 sm:px-6 lg:px-8">
+
+                    <!-- Título e Ações -->
+                    <div class="px-4 sm:px-0 flex flex-col md:flex-row md:items-center md:justify-between gap-y-4">
+                        
+                        <div class="flex items-center justify-center md:justify-start gap-x-3 order-last md:order-first">
+                            <h1 class="text-2xl font-bold tracking-tight text-gray-900">Painel de Pacientes</h1>
+                            <button id="show-unit-summary-button" title="Ver Resumo da Unidade" class="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-indigo-600 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
+                                  <path fill-rule="evenodd" d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Zm4.5 7.5a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0v-2.25a.75.75 0 0 1 .75-.75Zm3.75-1.5a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0V12Zm2.25-3a.75.75 0 0 1 .75.75v6.75a.75.75 0 0 1-1.5 0V9.75A.75.75 0 0 1 13.5 9Zm3.75-1.5a.75.75 0 0 0-1.5 0v9a.75.75 0 0 0 1.5 0v-9Z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div class="flex items-center justify-between md:justify-end gap-x-2 order-first md:order-last">
+                            <div class="relative">
+                                <button id="view-toggle-button" class="rounded-md border border-gray-300 bg-white p-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                                    <svg id="view-toggle-icon-grid" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                                    <svg id="view-toggle-icon-list" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 hidden"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+                                </button>
+                                <div id="view-toggle-dropdown" class="hidden absolute left-0 sm:right-0 sm:left-auto mt-2 w-32 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-20">
+                                    <div class="py-1">
+                                        <a href="#" data-view="grid" class="view-option-button text-gray-700 group flex items-center px-4 py-2 text-sm">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                                            Grade
+                                        </a>
+                                        <a href="#" data-view="list" class="view-option-button text-gray-700 group flex items-center px-4 py-2 text-sm">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+                                            Lista
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+        
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 text-gray-400">
+                                        <circle cx="11" cy="11" r="8" />
+                                        <path d="m21 21-4.3-4.3" />
+                                    </svg>
+                                </div>
+
+                                <input id="search-patient" type="text" placeholder=" "
+                                    class="block w-full rounded-md border-gray-300 py-2 pr-4 pl-10 shadow-sm focus:border-blue-500 focus:ring-blue-500 md:w-56"
+                                    autocomplete="off">
+                                
+                                <div id="search-placeholder-container" class="absolute inset-y-0 left-10 flex items-center text-gray-400 pointer-events-none">
+                                    <span class="md:hidden">Pacientes</span>
+                                    <span class="hidden md:inline">Buscar paciente...</span>
+                                </div>
+                            </div>
+                            <div class="relative" id="bed-filter-container">
+                                <button id="bed-filter-button" class="flex items-center justify-between w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 md:px-4 md:w-48">
+                                    <span id="bed-filter-button-text" class="truncate">
+                                        <span class="hidden md:inline">Buscar por </span><span>Leito</span>
+                                    </span>
+                                    <span id="bed-filter-clear-wrapper" class="hidden ml-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-red-500 hover:text-red-700"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </span>
+                                    <svg id="bed-filter-arrow-icon" class="h-5 w-5 ml-2 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                                </button>
+                                <div id="bed-filter-dropdown" class="hidden absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-20">
+                                    <div class="p-2">
+                                        <input id="bed-search-input" type="text" placeholder="Filtrar leitos..." class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" autocomplete="off">
+                                    </div>
+                                    <div id="bed-filter-list" class="max-h-60 overflow-y-auto p-1"></div>
+                                    <div class="border-t border-gray-200 p-2">
+                                        <button id="bed-filter-clear-button" class="w-full text-center text-sm text-blue-600 hover:underline">Limpar seleção</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button id="add-patient-button" class="flex items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 md:px-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 md:mr-2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                <span class="hidden md:inline">Novo Paciente</span>
+                                <span class="md:hidden">Novo</span>
+                            </button>
+                        </div>
+                    </div>
+
+
+                    <!-- Lista de Pacientes -->
+                    <div id="patient-list" class="mt-6 px-4 sm:px-0 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        <!-- Cards de pacientes serão inseridos aqui pelo JS -->
+                    </div>
+                    <div id="no-patients-message" class="hidden"></div>
+
+                    <div id="load-more-trigger" class="w-full py-8 flex justify-center items-center hidden">
+                        <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Tela de Detalhes do Paciente -->
+        <div id="patient-detail-screen" class="hidden h-full flex flex-col">
+            <header class="bg-white shadow-sm sticky top-0 z-10">
+                <div class="mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex h-16 items-center justify-between">
+                        <button id="back-to-dashboard" class="flex items-center text-blue-600 hover:text-blue-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 mr-2"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                            <span class="font-semibold">Voltar ao Painel</span>
+                        </button>
+                        <div class="flex items-center flex-wrap gap-2">
+                            <button id="record-handover-button" title="Passagem de Plantão por Voz" class="rounded-md bg-gray-100 p-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
+                                </svg>
+                            </button>
+                            <div id="sound-wave-container" class="hidden items-center ml-2 h-6 overflow-hidden">
+                                <div class="sound-wave"></div>
+                                <div class="sound-wave"></div>
+                                <div class="sound-wave"></div>
+                                <div class="sound-wave"></div>
+                            </div>
+                            <button id="show-summary-button" title="Ver Resumo Atual do Paciente" class="rounded-md bg-blue-100 p-2 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" />
+                                </svg>
+                            </button>
+                            <button id="delete-patient-button" title="Arquivar Paciente" class="rounded-md bg-red-100 p-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-grow overflow-y-auto p-4 sm:p-6 lg:p-8">
+
+                <div class="bg-white shadow-md rounded-lg p-4 mb-6">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center">
+                            <h1 id="patient-detail-name" class="text-2xl font-bold text-gray-900 truncate"></h1>
+                            <button id="edit-patient-details-button" title="Editar dados cadastrais do paciente" class="ml-3 p-1 rounded-full text-gray-500 hover:bg-gray-200 hover:text-blue-600 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                                    <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center space-x-2 flex-shrink-0 ml-4">
+                            <button id="show-last-handover-button" title="Ver Última Passagem" class="rounded-md bg-white sm:px-3 sm:py-2 p-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"> 
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:hidden" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                                    <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                                </svg>
+                                <span class="hidden sm:block">Última Passagem</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-2 text-sm text-gray-600 border-t pt-2">
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <div><span class="font-semibold">Idade:</span> <span id="patient-detail-age"></span></div>
+                            <div><span class="font-semibold">Internação:</span> <span id="patient-detail-admission-date"></span></div> 
+                            <div><span class="font-semibold">Leito:</span> <span id="patient-detail-room" class="font-mono"></span></div>
+                            <div><span class="font-semibold">Prontuário:</span> <span id="patient-detail-number" class="font-mono"></span></div>
+                        </div>
+                        
+                        <div class="flex items-center flex-wrap gap-2">
+                            <div id="patient-detail-news2"></div>
+                            <div id="patient-detail-fugulin"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="add-handovers-form" class="flex flex-col">
+                    <div id="modules-grid-container" class="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+                            <div id="module-diagnostico" class="bg-white rounded-lg shadow p-4 module-card">
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Diagnóstico e Situação
+                                    </h3>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="diagnostico">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="module-content-area">
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area">
+                                            <label class="block text-xs font-semibold text-gray-8002mb-1">Diagnóstico(s) Principal(is)</label>
+                                            <div id="diagnoses-tags-container" class="tags-display-area"></div>
+                                            <div id="diagnosis-input-wrapper" class="input-wrapper hidden mt-2">
+                                                <input type="text" id="form-diagnosis" autocomplete="off" placeholder="Buscar por CID ou nome..." class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1 px-2 text-sm">
+                                                <div id="diagnosis-autocomplete-container" class="relative">
+                                                    <div id="diagnosis-autocomplete-list" class="absolute w-full bg-white border rounded-md shadow-lg z-10 hidden"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Comorbidades</label>
+                                            <div id="comorbidities-tags-container" class="tags-display-area"></div>
+                                            <div id="comorbidities-input-wrapper" class="input-wrapper hidden mt-2">
+                                                <input type="text" id="form-comorbidities" autocomplete="off" placeholder="Adicionar e teclar Enter..." class="w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                            </div>
+                                        </div>
+                                    </div>
+                                                        
+                                    <div class="allergy-module-box clickable-item-area">
+                                        <label class="block text-xs font-semibold text-gray-800">Alérgico?</label>
+                                        <div class="flex items-center space-x-4 mt-2">
+                                            <label class="flex items-center cursor-pointer">
+                                                <input type="radio" id="allergy-radio-yes" name="allergy-known" class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                                                <span class="ml-2 text-sm">Sim</span>
+                                            </label>
+                                            <label class="flex items-center cursor-pointer">
+                                                <input type="radio" id="allergy-radio-no" name="allergy-known" class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                                                <span class="ml-2 text-sm">Não</span>
+                                            </label>
+                                        </div>
+                                        <div id="allergy-input-container" class="hidden mt-3 item-section-wrapper">
+                                            <label id="allergy-description-label" class="block text-xs font-semibold text-gray-800 mb-1">Alergias Conhecidas:</label>
+                                            <div id="allergies-tags-container" class="tags-display-area mb-2"></div>
+                                            <p id="allergy-placeholder-message" class="text-gray-500 text-xs italic hidden pl-1">Nenhuma alergia adicionada</p>
+                                            <div id="allergy-input-wrapper" class="input-wrapper hidden">
+                                                <input type="text" id="form-allergies" autocomplete="off" placeholder="Descrever e teclar Enter..." class="w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="evolution-section">
+                                        <label class="block text-xs font-semibold text-gray-800 mb-1">Evolução / Plano</label>
+                                        <textarea id="form-evolution" autocomplete="off" rows="3" class="mt-1 w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm" placeholder="Evolução do paciente, intercorrências e plano."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="module-cuidados-enfermagem" class="bg-white rounded-lg shadow p-4 module-card">
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Cuidados de Enfermagem
+                                    </h3>
+                                    <span id="live-fugulin-score" class="ml-auto font-mono text-sm font-bold text-gray-600 mr-4"></span>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="cuidados">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-3">
+                                    
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-fugulin="cuidadoCorporal">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Cuidado Corporal / Pele</label>
+                                            <div id="fugulin-cuidado-corporal-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="fugulin-cuidado-corporal-options" class="custom-select-options hidden"></div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-fugulin="motilidade">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Motilidade / Movimentação</label>
+                                            <div id="fugulin-motilidade-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="fugulin-motilidade-options" class="custom-select-options hidden"></div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-fugulin="deambulacao">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Deambulação</label>
+                                            <div id="fugulin-deambulacao-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="fugulin-deambulacao-options" class="custom-select-options hidden"></div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-fugulin="alimentacao">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Alimentação / Hidratação</label>
+                                            <div id="fugulin-alimentacao-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="fugulin-alimentacao-options" class="custom-select-options hidden"></div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-fugulin="eliminacao">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Cuidado com Eliminações</label>
+                                            <div id="fugulin-eliminacao-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="fugulin-eliminacao-options" class="custom-select-options hidden"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="module-exames" class="bg-white rounded-lg shadow p-4 module-card">
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Exames e Procedimentos
+                                    </h3>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="exames">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="exam-lists-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
+                                    <div>
+                                        <h4 class="text-xs font-semibold text-gray-700 mb-1 text-center border-b pb-1">A Fazer / Agendados</h4>
+                                        <div id="scheduled-exams-list" class="space-y-1 bg-gray-50 p-1 rounded-md min-h-[150px]"></div>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-semibold text-gray-700 mb-1 text-center border-b pb-1">Pendentes de Resultado</h4>
+                                        <div id="pending-exams-list" class="space-y-1 bg-gray-50 p-1 rounded-md min-h-[150px]"></div>
+                                    </div>
+                                </div>
+
+                                <div id="exam-editor-area" class="hidden border-t pt-3 mt-3">
+                                    <input type="hidden" id="exam-editor-id">
+                                    <input type="hidden" id="exam-editor-mode">
+                                    <button type="button" id="close-exam-editor-btn" class="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                    <h4 id="exam-editor-title" class="text-sm font-semibold text-gray-800 mb-2"></h4>
+                                    <div class="space-y-3">
+                                        <div id="exam-editor-name-input-wrapper">
+                                            <label for="exam-editor-name-input" class="block text-xs font-medium text-gray-700">Nome do Exame</label>
+                                            <input type="text" id="exam-editor-name-input" autocomplete="off" placeholder="Ex: Hemograma, TC de Crânio..." class="mt-1 w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                        </div>
+                                        <div id="exam-editor-name-display-wrapper" class="hidden">
+                                            <p class="text-xs font-medium text-gray-700">Exame</p>
+                                            <p id="exam-editor-name-display" class="mt-1 text-sm font-semibold text-gray-900"></p>
+                                        </div>
+                                        <div id="exam-editor-flow-choice-wrapper" class="hidden">
+                                            <div class="mt-1 flex space-x-2">
+                                                <button type="button" id="exam-editor-flow-schedule-btn" class="flex-1 rounded-md bg-blue-100 text-blue-700 px-3 py-1 text-xs font-semibold hover:bg-blue-200">Agendar</button>
+                                                <button type="button" id="exam-editor-flow-register-btn" class="flex-1 rounded-md bg-green-100 text-green-700 px-3 py-1 text-xs font-semibold hover:bg-green-200">Registrar Realização</button>
+                                            </div>
+                                        </div>
+                                        <div id="exam-editor-datetime-wrapper" class="hidden">
+                                            <label id="exam-editor-datetime-label" for="exam-editor-datetime-input" class="block text-xs font-medium text-gray-700">Data e Hora</label>
+                                            <input type="text" id="exam-editor-datetime-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                        </div>
+                                        <div id="exam-editor-result-choice-wrapper" class="hidden">
+                                            <label class="block text-xs font-medium text-gray-700">Resultado disponível?</label>
+                                            <div class="mt-1 flex space-x-2">
+                                                <button type="button" id="exam-editor-result-yes-btn" class="flex-1 rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold hover:bg-gray-100">Sim</button>
+                                                <button type="button" id="exam-editor-result-no-btn" class="flex-1 rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold hover:bg-gray-100">Não</button>
+                                            </div>
+                                        </div>
+                                        <div id="exam-editor-result-textarea-wrapper" class="hidden">
+                                            <label for="exam-editor-result-textarea" class="block text-xs font-medium text-gray-700">Descrição do Resultado</label>
+                                            <textarea id="exam-editor-result-textarea" autocomplete="off" rows="2" class="mt-1 w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm" placeholder="Descreva os achados relevantes..."></textarea>
+                                        </div>
+                                        <div id="exam-editor-actions-wrapper" class="hidden flex justify-end space-x-2 pt-2 border-t mt-2">
+                                            <button type="button" id="exam-editor-cancel-btn" class="rounded-md bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Cancelar</button>
+                                            <button type="button" id="exam-editor-save-btn" class="rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-blue-500">Confirmar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="exam-main-action-area" class="border-t pt-2 mt-auto"> <div class="flex justify-center">
+                                    <button type="button" id="add-new-exam-btn" class="rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-4 py-1 flex items-center space-x-2 text-xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                                        <span>Novo Exame</span>
+                                    </button>
+                                </div>
+                                </div>
+                            </div>
+
+                            <div id="module-riscos" class="bg-white rounded-lg shadow p-4 module-card">
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Riscos Assistenciais
+                                    </h3>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="riscos">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 gap-y-3">
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-risk="lpp">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Risco de LPP</label>
+                                            <div id="riscos-lpp-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="riscos-lpp-options" class="custom-select-options hidden"></div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-risk="quedas">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Risco de Quedas</label>
+                                            <div id="riscos-quedas-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="riscos-quedas-options" class="custom-select-options hidden"></div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-risk="bronco">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Risco de Broncoaspiração</label>
+                                            <div id="riscos-bronco-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="riscos-bronco-options" class="custom-select-options hidden"></div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area" data-risk="iras">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Risco de IRAS</label>
+                                            <div id="riscos-iras-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="riscos-iras-options" class="custom-select-options hidden"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="module-monitoramento" class="bg-white rounded-lg shadow p-4 module-card">
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Monitoramento
+                                    </h3>
+                                    <span id="live-news2-score" class="ml-auto font-mono text-sm font-bold text-gray-600 mr-4"></span>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="monitoramento">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                                <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">PA (mmHg)</label>
+                                            <div class="monitoring-display-area"></div>
+                                            <input type="text" id="form-sv-pa" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 120/80" data-validate="pressure">
+                                        </div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">FC (bpm)</label>
+                                            <div class="monitoring-display-area"></div>
+                                            <input type="text" id="form-sv-fc" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 75" data-validate="numeric">
+                                        </div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">FR (irpm)</label>
+                                            <div class="monitoring-display-area"></div>
+                                            <input type="text" id="form-sv-fr" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 16" data-validate="numeric">
+                                        </div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">SatO₂ (%)</label>
+                                            <div class="monitoring-display-area"></div>
+                                            <input type="text" id="form-sv-sato2" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 98" data-validate="numeric">
+                                        </div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Temp (°C)</label>
+                                            <div class="monitoring-display-area"></div>
+                                            <input type="text" id="form-sv-temp" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 36.5" data-validate="decimal">
+                                        </div>
+                                    </div>
+
+                                    <div class="item-section-wrapper">
+                                        <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">HGT (mg/dL)</label>
+                                            <div class="monitoring-display-area"></div>
+                                            <input type="text" id="form-sv-hgt" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Ex: 95" data-validate="numeric">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="lg:col-span-2 item-section-wrapper">
+                                        <div class="clickable-item-area" data-monitoring="consciencia">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Consciência</label>
+                                            <div id="monitoring-consciencia-container" class="tags-display-area"></div>
+                                        </div>
+                                        <div id="monitoring-consciencia-options" class="custom-select-options hidden"></div>
+                                    </div>
+
+                                    <div class="flex items-center justify-center p-2 border-2 border-dashed border-gray-200 rounded-lg">
+                                        <label class="flex items-center space-x-2 cursor-pointer">
+                                            <input type="checkbox" id="form-sv-o2" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                            <span class="text-sm font-medium text-gray-800">Uso de O₂?</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="lg:col-span-3 item-section-wrapper">
+                                        <div class="clickable-item-area monitoring-item-area" data-monitoring-item="true">
+                                            <label class="block text-xs font-semibold text-gray-800 mb-1">Diurese / Drenos / Outros</label>
+                                            <div class="monitoring-display-area"></div>
+                                            <input type="text" id="form-sv-others" autocomplete="off" class="monitoring-input w-full hidden" placeholder="Descrever..." data-validate="text">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="module-dispositivos" class="bg-white rounded-lg shadow p-4 module-card">
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Dispositivos
+                                    </h3>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="dispositivos">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="dispositivos-grid" class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm min-h-[100px]">
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="AVP MSE" class="rounded">
+                                            <span>AVP MSE</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="AVP MSD" class="rounded">
+                                            <span>AVP MSD</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="PICC" class="rounded">
+                                            <span>PICC</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="CVC" class="rounded">
+                                            <span>CVC</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="CDL" class="rounded">
+                                            <span>CDL</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="SNE" class="rounded">
+                                            <span>SNE</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="GTT" class="rounded">
+                                            <span>GTT</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="SVD" class="rounded">
+                                            <span>SVD</span>
+                                        </label>
+                                    </div>
+
+                                    <div class="device-item-box">
+                                        <label class="flex items-center space-x-2 w-full cursor-pointer">
+                                            <input type="checkbox" name="dispositivo" value="Monitor" class="rounded">
+                                            <span>Monitor</span>
+                                        </label>
+                                    </div>
+                                    
+                                    <div id="custom-dispositivos-container" class="contents"></div>
+
+                                </div>
+
+                                    <div id="outros-dispositivos-input-wrapper" class="input-wrapper hidden mt-2">
+                                        <input type="text" id="dispositivo-outros-input" placeholder="Digite o nome e tecle Enter..." class="w-full text-sm rounded-md border-gray-300 shadow-sm p-1">
+                                    </div>
+
+                                <div class="border-t pt-2 mt-2 flex justify-center trigger-wrapper">
+                                    <button type="button" id="add-custom-dispositivo-btn" class="add-item-trigger-btn rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-4 py-1 flex items-center space-x-2 text-xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                                        <span>Novo Dispositivo</span>
+                                    </button>
+                                </div>
+
+                                <div class="cancel-action-wrapper hidden border-t pt-2 mt-2 flex justify-center">
+                                    <button type="button" class="cancel-action-btn text-xs text-red-600 hover:underline mt-2">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="module-precaucoes" class="bg-white rounded-lg shadow p-4 module-card">
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Precauções
+                                    </h3>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="precaucoes">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div id="precaucoes-container" class="tags-display-area min-h-[24px]"></div>
+
+                                <div id="precaucoes-input-wrapper" class="input-wrapper hidden mt-2">
+                                    <input type="text" id="form-precaucoes" placeholder="Adicionar precaução e teclar Enter..." class="w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                </div>
+
+                                <div class="border-t pt-2 mt-2 flex justify-center trigger-wrapper">
+                                    <button type="button" class="add-item-trigger-btn rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-4 py-1 flex items-center space-x-2 text-xs" data-target-input="#precaucoes-input-wrapper">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                                        <span>Nova Precaução</span>
+                                    </button>
+                                </div>
+
+                                <div class="cancel-action-wrapper hidden border-t pt-2 mt-2 flex justify-center">
+                                    <button type="button" class="cancel-action-btn text-xs text-red-600 hover:underline mt-2">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="module-medicacoes" class="bg-white rounded-lg shadow p-4 module-card">
+                                    <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                        <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                            Medicações do Plantão
+                                        </h3>
+                                        <div class="flex items-center space-x-2">
+                                            <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="medicacoes">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                                <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                <input type="text" id="medication-time-picker-input" class="hidden">
+                                
+                                <div id="medications-list-container" class="space-y-2 min-h-[24px]"></div>
+
+                                <div class="mt-auto pt-3 border-t border-gray-200">
+            
+                                    <div id="medication-action-area" class="flex justify-center">
+                                        <button type="button" id="add-new-medication-btn" class="rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-4 py-1 flex items-center space-x-2 text-xs">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                                            <span>Nova Medicação</span>
+                                        </button>
+                                    </div>
+
+                                    <div id="medication-editor-area" class="hidden">
+                                        <div id="medication-search-editor">
+                                            <label for="form-medications" class="block text-xs font-medium text-gray-700 mb-1">Buscar ou Digitar Nova Medicação</label>
+                                            <div class="relative mt-1 flex items-center gap-x-2">
+                                                <div class="relative flex-grow">
+                                                    <input type="text" id="form-medications" autocomplete="off" placeholder="Buscar ou digitar nome..." class="w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                                    <div id="medication-autocomplete-container" class="relative">
+                                                        <div id="medication-autocomplete-list" class="absolute w-full bg-white border rounded-md shadow-lg z-10 hidden"></div>
+                                                    </div>
+                                                </div>
+                                                <button type="button" id="confirm-med-name-btn" class="hidden flex-shrink-0 rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-blue-500">Confirmar</button>
+                                            </div>
+                                        </div>
+
+                                        <div id="medication-time-editor" class="hidden">
+                                            <label id="medication-time-editor-label" class="block text-xs font-medium text-gray-700">Selecione o horário</label>
+                                            <div id="inline-time-picker-container" class="flex justify-center"></div>
+                                            <div class="flex items-center space-x-2 mt-2">
+                                                <button type="button" id="correct-med-time-btn" class="hidden flex-1 rounded-md bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Corrigir Antigo</button>
+                                                <button type="button" id="add-med-time-btn" class="flex-1 rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-blue-500">Adicionar Novo</button>
+                                            </div>
+                                        </div>
+
+                                        <button type="button" id="cancel-editor-btn" class="w-full text-center text-xs text-red-600 hover:underline mt-2">Cancelar</button>
+                                    </div>
+                                </div> 
+                            </div>
+
+                            <div id="module-observacoes" class="bg-white rounded-lg shadow p-4 module-card">
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Observações Gerais
+                                    </h3>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="observacoes">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="form-pending-obs" class="block text-xs font-medium text-gray-700 sr-only">Observações Gerais</label>
+                                    <textarea id="form-pending-obs" autocomplete="off" rows="2" class="w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm" placeholder="Algo importante para o próximo plantonista?"></textarea>
+                                </div>
+                            </div>
+                    </div>
+
+                    <div class="flex justify-end mt-6">
+                        <button type="submit" class="rounded-md bg-gray-400 cursor-not-allowed opacity-75 px-6 py-3 text-base font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" disabled>
+                            Salvar Passagem de Plantão
+                        </button>
+                    </div>
+                </form>
+
+            </main>
+        </div>
+
+        <!-- Modal para Histórico de Alterações do Módulo -->
+        <div id="module-history-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-10 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white">
+                <div class="flex justify-between items-center pb-3 border-b">
+                    <p id="module-history-title" class="text-2xl font-bold text-gray-800">Histórico de Alterações</p>
+                    <button id="close-module-history-modal" class="cursor-pointer z-50 p-2 rounded-full hover:bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-600"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div id="module-history-content" class="mt-4 max-h-[70vh] overflow-y-auto pr-2 space-y-4">
+                    </div>
+            </div>
+        </div>
+
+        <!-- Modal para Visualizar Detalhes do Plantão -->
+        <div id="view-handover-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+                <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white modal-flex-container">
+                    <div class="flex-shrink-0 flex flex-wrap justify-between items-center pb-3 border-b gap-y-2">
+                        <div class="flex items-center gap-x-4 order-2 sm:order-1">
+                            <button id="back-to-history-list-btn" class="modal-back-button" title="Voltar">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <div>
+                                <p id="view-handover-main-title" class="text-lg md:text-2xl font-bold text-gray-800">Detalhes do Plantão</p>
+                                <p id="view-handover-subtitle" class="text-xs sm:text-sm text-gray-500 mt-1"></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end space-x-2 order-1 sm:order-2 w-full sm:w-auto">
+                            <button id="print-handover-detail-button" title="Imprimir" class="rounded-md bg-gray-100 p-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            </button>
+                            <button id="close-view-handover-modal" class="cursor-pointer z-50 p-2 rounded-full hover:bg-gray-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-600"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="view-handover-content" class="mt-4 modal-scrollable-content">
+                        </div>
+
+                    <div id="view-handover-adendos-section" class="adendos-container">
+                        <div id="adendos-visible-wrapper-view-handover" class="hidden">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-base font-semibold text-gray-700">Adendos</h4>
+                                <button id="toggle-adendos-view-view-handover" class="toggle-adendos-view-btn adendo-toggle-icon-btn hidden" data-state="last" title="Fechar">
+                                <svg class="h-5 w-5 icon-expand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
+                                </svg>
+                                <svg class="h-5 w-5 icon-collapse hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                </svg>
+                            </button>
+                            </div>
+                            <div id="adendos-list-view-handover" class="adendos-list">
+                                </div>
+                        </div>
+
+                        <div id="inline-adendo-form-wrapper-view-handover" class="inline-adendo-form-wrapper mt-2 hidden">
+                            <textarea id="adendo-text-view-handover" rows="2" class="w-full rounded-md border-gray-300 shadow-sm text-sm" placeholder="Digite seu adendo..."></textarea>
+                            <div class="flex justify-end space-x-2 mt-2">
+                                <button type="button" class="cancel-adendo-btn px-3 py-1 text-sm font-semibold text-gray-700 rounded-md hover:bg-gray-100">Cancelar</button>
+                                <button type="button" class="save-adendo-btn rounded-md bg-blue-600 px-4 py-1 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Salvar Adendo</button>
+                            </div>
+                        </div>
+
+                        <div id="add-adendo-trigger-wrapper-view-handover" class="add-adendo-trigger-wrapper mt-2">
+                            <button type="button" class="add-adendo-trigger-btn rounded-md bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-3 py-1 flex items-center space-x-2 text-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                                <span>Adicionar Adendo</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        <!-- Modal para Resumo do Paciente -->
+        <div id="patient-summary-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-5 mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white">
+                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center pb-3 border-b gap-y-2">
+                    <div class="w-full flex items-center justify-between order-1 sm:w-auto sm:order-2 space-x-2">
+                        <button id="print-patient-button" title="Imprimir Resumo" class="rounded-md bg-gray-100 p-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        </button>
+                        <button id="close-summary-modal-button" class="cursor-pointer z-50 p-2 rounded-full hover:bg-gray-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-600"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                    <div class="w-full order-2 sm:order-1">
+                        <p id="patient-summary-title" class="text-lg sm:text-2xl font-bold text-gray-800">Resumo Clínico da Semana</p>
+                        <p id="patient-summary-subtitle" class="text-sm text-gray-500"></p>
+                    </div>
+                </div>
+                
+                <div id="patient-summary-content" class="mt-4 max-h-[80vh] overflow-y-auto pr-2">
+                    
+                    <div id="summary-loader" class="text-center p-10">
+                        <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <p class="mt-3 text-gray-600">Analisando dados da semana...</p>
+                    </div>
+
+                    <div id="summary-main-container" class="hidden space-y-6">
+                        
+                        <div id="kpi-panel-container">
+                            <h3 class="text-base font-semibold text-gray-700 mb-2">Destaques da Semana</h3>
+                            <div id="kpi-panel" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                </div>
+                        </div>
+
+                        <div id="trends-chart-container">
+                            <h3 class="text-base font-semibold text-gray-700 mb-2">Tendências de Sinais Vitais e Scores</h3>
+                            <div class="bg-gray-50 p-2 rounded-lg">
+                                <canvas id="trends-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div id="events-table-container">
+                            <h3 class="text-base font-semibold text-gray-700 mb-2">Linha do Tempo de Eventos Relevantes</h3>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full bg-white border">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="text-left text-xs font-semibold text-gray-600 uppercase p-2">Data/Hora</th>
+                                            <th class="text-left text-xs font-semibold text-gray-600 uppercase p-2">Categoria</th>
+                                            <th class="text-left text-xs font-semibold text-gray-600 uppercase p-2">Evento / Descrição</th>
+                                            <th class="text-left text-xs font-semibold text-gray-600 uppercase p-2">Profissional</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="events-table-body">
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal para Adicionar Paciente -->
+        <div id="add-patient-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Cadastrar Novo Paciente</p>
+                    <button id="close-modal-button" class="cursor-pointer z-50">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <form id="add-patient-form" class="space-y-5" autocomplete="off">
+                    <div>
+                        <label for="new-patient-name" class="block text-sm font-medium text-gray-700">Nome Completo</label>
+                        <input id="new-patient-name" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Digite o nome completo do paciente">
+                    </div>
+                    <div>
+                        <label for="new-patient-dob" class="block text-sm font-medium text-gray-700">Data de Nascimento</label>
+                        <input id="new-patient-dob" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Selecione a data">
+                    </div>
+                    <div>
+                        <label for="new-patient-number" class="block text-sm font-medium text-gray-700">Nº do Prontuário</label>
+                        <input id="new-patient-number" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Digite o número do prontuário">
+                    </div>
+                    <div>
+                        <label for="new-patient-room" class="block text-sm font-medium text-gray-700">Nº do Leito/Sala</label>
+                        <input id="new-patient-room" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Digite o número do leito">
+                    </div>
+                    <div class="flex justify-end pt-4">
+                        <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Salvar Paciente</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal para Editar Paciente -->
+        <div id="edit-patient-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-10 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Editar Dados Cadastrais do Paciente</p>
+                    <button id="close-edit-modal-button" class="cursor-pointer z-50">&times;</button>
+                </div>
+                <div class="text-sm text-gray-600 mb-4">
+                    As informações originais não serão apagadas. Uma nova entrada será criada no histórico com a sua justificativa.
+                </div>
+                <form id="edit-patient-form" class="space-y-4" autocomplete="off">
+                    <input type="hidden" id="edit-patient-id">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium">Nome Completo</label>
+                            <input id="edit-patient-name" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium">Data de Nascimento</label>
+                            <input id="edit-patient-dob" type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="dd/mm/aaaa">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium">Nº do Prontuário</label>
+                            <input id="edit-patient-number" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium">Nº do Leito/Sala</label>
+                            <input id="edit-patient-room" type="number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Justificativa da Correção / Adendo</label>
+                        <textarea id="edit-patient-justification" required rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="Ex: Correção de erro de digitação no prontuário."></textarea>
+                    </div>
+                    <div class="flex justify-end pt-4">
+                        <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Salvar Correção</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal para Visualizar Histórico Completo -->
+        <div id="full-history-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white modal-flex-container">
+                <div class="flex justify-between items-center pb-3 border-b">
+                    <div class="flex items-center gap-x-4">
+                        <button id="back-to-last-handover-btn" class="modal-back-button" title="Voltar para Última Passagem">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <p class="text-lg md:text-2xl font-bold text-gray-800">Histórico Completo de Passagens de Plantão</p>
+                    </div>
+                    <button id="close-full-history-modal" class="cursor-pointer z-50 p-2 rounded-full hover:bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-600"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+
+                <div id="full-history-content-wrapper" class="mt-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <div id="full-history-content" class="space-y-0">
+                        </div>
+                </div>
+                <div id="full-history-pagination" class="flex justify-center items-center mt-4 pt-4 border-t"></div>
+            </div>
+        </div>
+
+        <!-- Modal de Confirmação de Exclusão -->
+        <div id="delete-confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-red-600"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                    </div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Arquivar Paciente</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500">
+                            Tem certeza que deseja arquivar este paciente e todo o seu histórico?<br>Esta ação não pode ser desfeita.
+                        </p>
+                    </div>
+                    <div class="items-center px-4 py-3 space-x-4">
+                        <button id="confirm-delete-button" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                            Arquivar
+                        </button>
+                        <button id="cancel-delete-button" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="generic-confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <!-- Ícone e cores atualizados para o tema azul -->
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h3 id="generic-confirm-title" class="text-lg leading-6 font-medium text-gray-900 mt-4">Título da Confirmação</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p id="generic-confirm-text" class="text-sm text-gray-500">
+                            Texto da confirmação vai aqui.
+                        </p>
+                    </div>
+                    <div class="items-center px-4 py-3 space-x-4">
+                        <!-- Botão de confirmação atualizado para o tema azul -->
+                        <button id="generic-confirm-button" class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            Confirmar Ação
+                        </button>
+                        <button id="generic-cancel-button" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="cancel-exam-confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Cancelar Exame</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p id="cancel-exam-modal-text" class="text-sm text-gray-500">
+                            Tem certeza de que deseja cancelar este exame? Ele será removido da lista a partir deste plantão.
+                        </p>
+                    </div>
+                    <div class="items-center px-4 py-3 space-x-4">
+                        <button id="confirm-cancel-exam-button" class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            Sim, Cancelar
+                        </button>
+                        <button id="cancel-cancel-exam-button" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                            Voltar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="clear-allergies-confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Remover Alergias?</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p id="clear-allergies-modal-text" class="text-sm text-gray-500">
+                            Mudar para "Não" irá remover todas as alergias listadas. Deseja continuar?
+                        </p>
+                    </div>
+                    <div class="items-center px-4 py-3 space-x-4">
+                        <button id="confirm-clear-allergies-button" class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            Sim, Remover
+                        </button>
+                        <button id="cancel-clear-allergies-button" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="last-handover-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 overflow-y-auto h-full w-full z-50">
+                <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white modal-flex-container">
+                    <div class="flex-shrink-0 flex flex-col sm:flex-row sm:justify-between sm:items-center pb-3 border-b gap-y-2">
+                        <div class="w-full flex items-center justify-between order-1 sm:w-auto sm:order-2 space-x-2">
+                            <div class="flex items-center space-x-2">
+                                <button id="print-last-handover-button" title="Imprimir" class="rounded-md bg-gray-100 p-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                </button>
+                                <button id="open-full-history-from-last-handover-btn" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-300 hover:bg-blue-50">
+                                    Histórico
+                                </button>
+                            </div>
+                            <button id="close-last-handover-modal" class="cursor-pointer z-50 p-2 rounded-full hover:bg-gray-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-600"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+                        <div class="w-full order-2 sm:order-1">
+                            <p id="last-handover-title" class="text-lg md:text-2xl font-bold text-gray-800">Última Passagem de Plantão</p>
+                            <p id="last-handover-subtitle" class="text-sm text-gray-500 mt-1"></p>
+                        </div>
+                    </div>
+
+                    <div id="last-handover-content" class="mt-4 text-sm modal-scrollable-content">
+                        </div>
+
+                    <div id="last-handover-adendos-section" class="adendos-container">
+                        <div id="adendos-visible-wrapper-last-handover" class="hidden">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-base font-semibold text-gray-700">Adendos</h4>
+                                <button id="toggle-adendos-view-last-handover" class="toggle-adendos-view-btn adendo-toggle-icon-btn hidden" data-state="last" title="Ver todos os adendos">
+                                    <svg class="h-5 w-5 icon-expand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
+                                    </svg>
+                                    <svg class="h-5 w-5 icon-collapse hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="adendos-list-last-handover" class="adendos-list">
+                                </div>
+                        </div>
+
+                        <div id="inline-adendo-form-wrapper-last-handover" class="inline-adendo-form-wrapper mt-2 hidden">
+                            <textarea id="adendo-text-last-handover" rows="2" class="w-full rounded-md border-gray-300 shadow-sm text-sm" placeholder="Digite seu adendo..."></textarea>
+                            <div class="flex justify-end space-x-2 mt-2">
+                                <button type="button" class="cancel-adendo-btn px-3 py-1 text-sm font-semibold text-gray-700 rounded-md hover:bg-gray-100">Cancelar</button>
+                                <button type="button" class="save-adendo-btn rounded-md bg-blue-600 px-4 py-1 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Salvar Adendo</button>
+                            </div>
+                        </div>
+                        
+                        <div id="add-adendo-trigger-wrapper-last-handover" class="add-adendo-trigger-wrapper mt-2">
+                            <button type="button" class="add-adendo-trigger-btn rounded-md bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold px-3 py-1 flex items-center space-x-2 text-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                                <span>Adicionar Adendo</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+         <!-- Toast de Notificação -->
+        <div id="toast" class="hidden fixed bottom-5 right-5 bg-gray-900 text-white py-3 px-6 rounded-lg shadow-lg transition-opacity duration-300">
+            <p id="toast-message"></p>
+        </div>
+    </div>
+    <div id="print-view"></div>
+
+    <div id="unit-summary-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-5 mx-auto p-5 border w-full max-w-7xl shadow-lg rounded-md bg-white">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center pb-3 border-b gap-y-2">
+                <div class="w-full flex items-center justify-between order-1 sm:w-auto sm:order-2 space-x-2">
+                    <button id="print-unit-summary-button" title="Imprimir Resumo da Unidade" class="rounded-md bg-gray-100 p-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    </button>
+                    <button id="close-unit-summary-modal-button" class="cursor-pointer z-50 p-2 rounded-full hover:bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-600"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div class="w-full order-2 sm:order-1">
+                    <p id="unit-summary-title" class="text-lg sm:text-2xl font-bold text-gray-800">Resumo Geral da Unidade</p>
+                    <p id="unit-summary-subtitle" class="text-sm text-gray-600">Dados atualizados em tempo real</p>
+                </div>
+            </div>
+            
+            <div id="unit-summary-content" class="mt-4 max-h-[80vh] overflow-y-auto pr-2">
+                
+                <div id="unit-summary-loader" class="text-center p-10">
+                    <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <p class="mt-3 text-gray-600">Analisando dados da unidade...</p>
+                </div>
+
+                <div id="unit-summary-main-container" class="hidden space-y-6">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-700 mb-2">Visão Geral da Unidade</h3>
+                        <div id="unit-kpi-panel" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                            </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-700 mb-2 text-center">Distribuição por Complexidade (Fugulin)</h3>
+                            <div class="bg-gray-50 p-2 rounded-lg h-64 flex justify-center items-center">
+                                <canvas id="fugulin-distribution-chart"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-700 mb-2 text-center">5 Principais Medicações (Últimos 7 dias)</h3>
+                            <div class="bg-gray-50 p-2 rounded-lg h-64 flex justify-center items-center">
+                                <canvas id="medication-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-2">
+                            <h3 class="text-base font-semibold text-gray-700 mb-2 text-center">Tendência Semanal: Complexidade (Fugulin) vs. Gravidade (NEWS)</h3>
+                            <div class="bg-gray-50 p-2 rounded-lg h-72">
+                                <canvas id="trends-chart-unit"></canvas>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-2">
+                            <h3 class="text-base font-semibold text-gray-700 mb-2 text-center">Fluxo de Pacientes (Admissões vs. Saídas)</h3>
+                            <div class="bg-gray-50 p-2 rounded-lg h-72">
+                                <canvas id="flow-chart-unit"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-700 mb-2">5 Pacientes com Maior Risco de Deterioração</h3>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full bg-white border text-sm">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="text-left font-semibold text-gray-600 p-2">Leito</th>
+                                            <th class="text-left font-semibold text-gray-600 p-2">Paciente</th>
+                                            <th class="text-left font-semibold text-gray-600 p-2">NEWS</th>
+                                            <th class="text-left font-semibold text-gray-600 p-2">Tend.</th>
+                                            <th class="text-left font-semibold text-gray-600 p-2">Último Profissional</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="high-risk-table-body">
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-700 mb-2">Diagnósticos Mais Frequentes (Últimos 7 dias)</h3>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full bg-white border text-sm">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="text-left font-semibold text-gray-600 p-2">Diagnóstico</th>
+                                            <th class="text-left font-semibold text-gray-600 p-2">Nº Pac.</th>
+                                            <th class="text-left font-semibold text-gray-600 p-2">% Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="diagnosis-frequency-table-body">
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="action-loading-overlay" class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center z-[9999]">
+        <div class="text-center">
+            <svg class="animate-spin h-10 w-10 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-lg font-medium text-white">Carregando...</p>
+        </div>
+    </div>
+
+    <div id="ai-confirmation-popup" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900 bg-opacity-75 p-4">
+        <div class="flex h-full max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-gray-50 shadow-2xl">
+            <div class="flex-shrink-0 border-b border-gray-200 p-4">
+                <h3 class="text-lg font-semibold leading-6 text-gray-900">Confirme os Dados Extraídos por Voz</h3>
+                <p class="mt-1 text-sm text-gray-600">Revise e edite as informações abaixo antes de inseri-las no formulário. Apenas os campos com dados detectados no áudio são exibidos.</p>
+            </div>
+
+            <div class="flex-grow overflow-y-auto p-4">
+                <div id="ai-popup-no-data" class="hidden text-center p-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhuma informação detectada</h3>
+                    <p class="mt-1 text-sm text-gray-500">Não conseguimos extrair dados válidos do áudio. Por favor, tente falar de forma mais clara e pausada.</p>
+                </div>
+                <form id="ai-confirmation-form" class="space-y-4">
+                    <div id="popup-module-diagnostico" class="popup-module-card sm:col-span-4">
+                        <h4 class="popup-module-header">⚕️ Diagnóstico e Observações</h4>
+                        <div class="popup-module-content">
+                            <div class="sm:col-span-4">
+                                <label for="popup-diagnostico" class="block text-sm font-medium leading-6 text-gray-900">Diagnóstico Principal</label>
+                                <div class="relative"> <input type="text" id="popup-diagnostico">
+                                    <button type="button" class="popup-search-icon" data-target-input="popup-diagnostico" data-search-type="diagnosis" title="Buscar sugestões">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 search-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                                        <svg class="h-5 w-5 animate-spin spinner-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    </button>
+                                </div>
+                                <div id="popup-diagnosis-autocomplete-list" class="popup-autocomplete-list hidden"></div>
+                            </div>
+                            <div id="popup-comorbidades-container" class="sm:col-span-3">
+                                <label for="popup-comorbidades" class="block text-sm font-medium leading-6 text-gray-900">Comorbidades</label>
+                                <input type="text" id="popup-comorbidades" placeholder="Separadas por vírgula">
+                            </div>
+                            <div id="popup-alergias-container" class="sm:col-span-3">
+                                <label for="popup-alergias" class="block text-sm font-medium leading-6 text-gray-900">Alergias</label>
+                                <input type="text" id="popup-alergias" placeholder="Separadas por vírgula">
+                            </div>
+                            <div id="popup-observacoes-container">
+                                <label for="popup-observacoes">Observações / Intercorrências</label>
+                                <textarea id="popup-observacoes" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="popup-module-sv" class="popup-module-card hidden">
+                        <h4 class="popup-module-header">📈 Monitoramento e Sinais Vitais</h4>
+                        <div class="popup-module-content">
+                            <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
+                                <div><label for="popup-pa">PA (mmHg)</label><input type="text" id="popup-pa"></div>
+                                <div><label for="popup-fc">FC (bpm)</label><input type="text" id="popup-fc"></div>
+                                <div><label for="popup-fr">FR (irpm)</label><input type="text" id="popup-fr"></div>
+                                <div><label for="popup-temp">Temp (°C)</label><input type="text" id="popup-temp"></div>
+                                <div><label for="popup-sat">SatO₂ (%)</label><input type="text" id="popup-sat"></div>
+                                <div><label for="popup-glicemia">Glicemia (mg/dL)</label><input type="text" id="popup-glicemia"></div>
+                            </div>
+                            <div>
+                                <label for="popup-outros-monitoramento">Diurese / Drenos / Outros</label>
+                                <input type="text" id="popup-outros-monitoramento">
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="popup-uso-o2" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <label for="popup-uso-o2" class="ml-2 block text-sm text-gray-900">Paciente em uso de O₂ suplementar?</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="popup-module-dispositivos" class="popup-module-card hidden">
+                        <h4 class="popup-module-header">🔌 Dispositivos</h4>
+                        <div class="popup-module-content">
+                            <div>
+                                <label>Dispositivos Mencionados</label>
+                                <div id="popup-devices-list" class="space-y-2 mt-1">
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="popup-module-medicacoes" class="popup-module-card hidden">
+                        <h4 class="popup-module-header">💉 Medicações</h4>
+                        <div class="popup-module-content">
+                            <div>
+                                <label>Medicações Administradas</label>
+                                <div id="popup-medicamentos-list" class="space-y-2 mt-1">
+                                    </div>
+                                <div id="popup-medication-autocomplete-list" class="popup-autocomplete-list hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="popup-module-exames" class="popup-module-card hidden">
+                        <h4 class="popup-module-header">🧪 Exames</h4>
+                        <div class="popup-module-content">
+                            <div>
+                                <label>Exames Mencionados (Confirme os dados)</label>
+                                <div id="popup-exames-list" class="space-y-2 mt-1">
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="popup-module-riscos" class="popup-module-card hidden">
+                        <h4 class="popup-module-header">⚠️ Recomendações de Riscos Assistenciais</h4>
+                        <div id="popup-risks-recommendations" class="popup-module-content space-y-3"></div>
+                    </div>
+
+                    <div id="popup-module-cuidados-sugestoes" class="popup-module-card hidden">
+                        <h4 class="popup-module-header">🩺 Recomendações de Cuidados de Enfermagem</h4>
+                        <div id="popup-care-recommendations" class="popup-module-content space-y-3"></div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="flex-shrink-0 border-t border-gray-200 bg-gray-100 p-4">
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-ai-popup" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancelar</button>
+                    <button type="button" id="confirm-ai-popup" class="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">Inserir Dados</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="scripts/app.js"></script>
+    
+</body>
+
+</html>
