@@ -1062,6 +1062,146 @@
             display: none;
         }
 
+        /* Estilo para destacar card de paciente com medicação atrasada */
+        .patient-card.overdue-medication, .patient-list-item.overdue-medication {
+            background-color: #fee2e2; /* bg-red-100 */
+            border-color: #fca5a5; /* border-red-300 */
+        }
+
+        /* Estilos para o painel de medicações da unidade */
+        #unit-medications-content .medication-patient-card {
+            background-color: #f9fafb; /* bg-gray-50 */
+            border: 1px solid #e5e7eb; /* border-gray-200 */
+            border-radius: 0.5rem; /* rounded-lg */
+            padding: 0.75rem 1rem;
+        }
+
+        #unit-medications-content .medication-patient-card.is-overdue {
+            background-color: #fef2f2; /* bg-red-50 */
+            border-color: #fecaca; /* border-red-200 */
+        }
+
+        #unit-medications-content .medication-item {
+            font-size: 0.875rem; /* text-sm */
+        }
+
+        #unit-medications-content .medication-item.is-overdue .medication-time {
+            color: #dc2626; /* text-red-600 */
+            font-weight: 600; /* font-semibold */
+        }
+
+        /* Cor do ícone de sino de medicação quando há atrasos */
+        #show-unit-medications-button.has-overdue {
+            color: #dc2626; /* text-red-600 */
+        }
+
+        #module-medicacoes {
+            display: flex;
+            flex-direction: column;
+            height: 400px; /* Define uma altura fixa para permitir a rolagem interna */
+        }
+
+        .medication-list {
+            flex-grow: 1;
+            background-color: #f9fafb; /* bg-gray-50 */
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.5rem;
+            overflow-y: auto;
+            display: flex; /* Adicionado para usar gap */
+            flex-direction: column; /* Adicionado para usar gap */
+            gap: 0.5rem; /* Adiciona espaçamento entre os itens da lista */
+        }
+
+        .medication-grid-container {
+            flex-grow: 1;
+            min-height: 0;
+        }
+
+        .medication-column {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .medication-column-header {
+            font-size: 0.75rem; /* text-xs */
+            font-weight: 600; /* font-semibold */
+            color: #4b5563; /* text-gray-600 */
+            margin-bottom: 0.25rem;
+            text-align: center;
+            border-bottom: 1px solid #f3f4f6; /* border-gray-100 */
+            padding-bottom: 0.25rem;
+        }
+
+        .medication-list {
+            flex-grow: 1;
+            background-color: #f9fafb; /* bg-gray-50 */
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.5rem;
+            overflow-y: auto;
+        }
+
+        .medication-list-item {
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb; /* border-gray-200 */
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.5rem 0.75rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+            font-size: 0.875rem; /* text-sm */
+            transition: all 0.2s ease-in-out;
+        }
+
+        .medication-list-item.is-overdue {
+            background-color: #fef2f2; /* bg-red-50 */
+            border-color: #fecaca; /* border-red-200 */
+        }
+
+        .medication-list-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .medication-list-item-name {
+            font-weight: 600; /* font-semibold */
+            color: #1f2937; /* text-gray-800 */
+        }
+
+        .medication-list-item-dose {
+            font-size: 0.75rem; /* text-xs */
+            color: #6b7280; /* text-gray-500 */
+        }
+
+        .medication-list-item-time {
+            font-size: 0.75rem; /* text-xs */
+            font-weight: 500; /* font-medium */
+            color: #4b5563; /* text-gray-600 */
+            margin-top: 0.25rem;
+        }
+
+        .medication-list-item-actions {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .med-action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 9999px;
+            transition: background-color 0.2s;
+        }
+
+        .med-action-btn svg {
+            width: 1rem; /* h-4 */
+            height: 1rem; /* w-4 */
+        }
+
+        .med-action-btn:hover {
+            background-color: #f3f4f6; /* bg-gray-100 */
+        }
+
         @keyframes sound-wave-animation {
             0%, 40%, 100% {
                 transform: scaleY(0.1);
