@@ -115,7 +115,9 @@
         let allPatientsLoaded = false;    // Indica se todos os pacientes já foram carregados
         let debounceTimer;
         let originalPatientState = { allergies: [] };
-        let currentMedications = [];
+        let activePrescriptions = [];
+        let administeredInShift = [];
+        let medicationUITimer = null;
         let resolvedPendingExams = {};
         let currentHandovers = [];
         let currentPatientData = {};
@@ -142,6 +144,19 @@
         let unitTrendsChart = null;
         let unitFlowChart = null;
         let currentUnitSummaryData = null;
+
+        // Modal de Medicações
+        const showUnitMedicationsButton = document.getElementById('show-unit-medications-button');
+        const unitMedicationsModal = document.getElementById('unit-medications-modal');
+        const closeUnitMedicationsModalButton = document.getElementById('close-unit-medications-modal-button');
+        const unitMedicationsContent = document.getElementById('unit-medications-content');
+        const medicationAlertIndicator = document.getElementById('medication-alert-indicator');
+        const administerMedConfirmModal = document.getElementById('administer-med-confirm-modal');
+        const confirmAdministerMedButton = document.getElementById('confirm-administer-med-button');
+        const cancelAdministerMedButton = document.getElementById('cancel-administer-med-button');
+        const deletePrescriptionConfirmModal = document.getElementById('delete-prescription-confirm-modal');
+        const confirmDeletePrescriptionButton = document.getElementById('confirm-delete-prescription-button');
+        const cancelDeletePrescriptionButton = document.getElementById('cancel-delete-prescription-button');
 
         // Modal de Última Passagem de Plantão
         const showLastHandoverButton = document.getElementById('show-last-handover-button');
@@ -475,31 +490,34 @@
         const printLastHandoverButton = document.getElementById('print-last-handover-button');
         const printHandoverDetailButton = document.getElementById('print-handover-detail-button');
 
-        /**
-         * Gerencia a visibilidade dos diferentes modos do editor de medicação.
-         * @param {'search' | 'time' | false} mode - O modo a ser exibido ou false para esconder.
-         */
-        function showMedicationEditor(mode) {
-            if (!mode) {
-                medicationEditorArea.classList.add('hidden');
-                medicationActionArea.classList.remove('hidden');
-                medicationSearchEditor.classList.add('hidden');
-                medicationTimeEditor.classList.add('hidden');
-                medicationInput.value = '';
-            } else {
-                medicationActionArea.classList.add('hidden');
-                medicationEditorArea.classList.remove('hidden');
+        // --- LÓGICA DE MEDICAÇÕES ---
+        const medEditorArea = document.getElementById('medication-editor-area');
+        const medEditorCloseBtn = document.getElementById('med-editor-close-btn');
+        const medMainActionArea = document.getElementById('medication-main-action-area');
 
-                if (mode === 'search') {
-                    medicationTimeEditor.classList.add('hidden');
-                    medicationSearchEditor.classList.remove('hidden');
-                    medicationInput.focus();
-                } else if (mode === 'time') {
-                    medicationSearchEditor.classList.add('hidden');
-                    medicationTimeEditor.classList.remove('hidden');
-                }
-            }
-        }
+        const medEditor = {
+            id: document.getElementById('med-editor-id'),
+            mode: document.getElementById('med-editor-mode'),
+            title: document.getElementById('med-editor-title'),
+            name: document.getElementById('med-editor-name'),
+            dose: document.getElementById('med-editor-dose'),
+            startTime: document.getElementById('med-editor-start-time'),
+            frequency: document.getElementById('med-editor-frequency'),
+            duration: document.getElementById('med-editor-duration'),
+            datetimeInput: document.getElementById('med-editor-datetime-input'),
+            datetimeLabel: document.getElementById('med-editor-datetime-label'),
+            backBtn: document.getElementById('med-editor-back-btn'),
+            saveBtn: document.getElementById('med-editor-save-btn')
+        };
+
+        const medSteps = {
+            step1: document.getElementById('med-step-1-basic-info'),
+            step2: document.getElementById('med-step-2-type-selection'),
+            step3a: document.getElementById('med-step-3a-single-dose-action'),
+            step3b: document.getElementById('med-step-3b-continuous-dose-details'),
+            step4: document.getElementById('med-step-4-datetime-picker'),
+            actions: document.getElementById('med-editor-final-actions')
+        };
 
         /**
          * FUNÇÃO DE PROCESSAMENTO
@@ -1414,6 +1432,76 @@
             }
         }
 
+        /**
+         * Orquestra a exibição do modal de medicações da unidade, buscando os dados e renderizando.
+         */
+        async function showUnitMedicationsPanel() {
+            unitMedicationsModal.classList.remove('hidden');
+            unitMedicationsContent.innerHTML = '<p class="text-center text-gray-500">Carregando medicações...</p>';
+
+            try {
+                const medications = await getUpcomingAndOverdueMedications();
+
+                // Ordena: atrasadas primeiro, depois as mais próximas
+                medications.sort((a, b) => a.time.getTime() - b.time.getTime());
+
+                if (medications.length === 0) {
+                    unitMedicationsContent.innerHTML = '<p class="text-center text-gray-500 italic">Nenhuma medicação agendada na unidade.</p>';
+                    return;
+                }
+
+                // Agrupa as medicações por paciente
+                const medsByPatient = medications.reduce((acc, med) => {
+                    if (!acc[med.patientId]) {
+                        acc[med.patientId] = {
+                            patientName: med.patientName,
+                            roomNumber: med.roomNumber,
+                            patientNumber: med.patientNumber,
+                            meds: []
+                        };
+                    }
+                    acc[med.patientId].meds.push(med);
+                    return acc;
+                }, {});
+
+                unitMedicationsContent.innerHTML = '';
+                const now = new Date();
+
+                for (const patientId in medsByPatient) {
+                    const patientData = medsByPatient[patientId];
+                    const hasOverdue = patientData.meds.some(m => m.time < now);
+
+                    const card = document.createElement('div');
+                    card.className = `medication-patient-card ${hasOverdue ? 'is-overdue' : ''}`;
+
+                    let medsHtml = patientData.meds.map(med => {
+                        const isOverdue = med.time < now;
+                        const timeString = med.time.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        return `
+                            <li class="medication-item ${isOverdue ? 'is-overdue' : ''}">
+                                <span class="medication-time font-mono">${timeString}</span> - <strong>${med.medicationName} ${med.dose}</strong>
+                            </li>
+                        `;
+                    }).join('');
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-gray-800">${patientData.patientName}</h4>
+                            <p class="text-sm text-gray-600">Leito: ${patientData.roomNumber} | Pront.: ${patientData.patientNumber}</p>
+                        </div>
+                        <ul class="list-disc pl-5 space-y-1">
+                            ${medsHtml}
+                        </ul>
+                    `;
+                    unitMedicationsContent.appendChild(card);
+                }
+
+            } catch (error) {
+                console.error("Erro ao mostrar painel de medicações:", error);
+                unitMedicationsContent.innerHTML = '<p class="text-center text-red-500">Falha ao carregar as medicações.</p>';
+            }
+        }
+
         // --- FUNÇÕES DE NAVEGAÇÃO E UI ---~
 
         /**
@@ -2100,7 +2188,8 @@
             };
 
             addHandoversForm.reset();
-            currentMedications = [];
+            activePrescriptions = [];
+            administeredInShift = [];
             patientExams = [];
             currentShiftCompletedExams = [];
             currentCustomDevices = [];
@@ -2191,7 +2280,6 @@
                 // Se o campo de busca estiver vazio e o editor de tempo não estiver aberto,
                 // reseta a UI interna do módulo para o estado inicial.
                 if (medicationInput.value.trim() === '' && timeEditor.classList.contains('hidden')) {
-                    showMedicationEditor(false); 
                 }
             }
 
@@ -3874,87 +3962,6 @@
             }, 750);
         });
 
-        // Novo listener para o botão "Confirmar" do nome da medicação
-        document.getElementById('confirm-med-name-btn').addEventListener('click', () => {
-            const inputValue = medicationInput.value.trim();
-            if (inputValue) {
-                handleMedicationSelection(inputValue);
-                document.getElementById('confirm-med-name-btn').classList.add('hidden');
-                medicationInput.value = ''; // Limpa o input após a confirmação
-            }
-        });
-
-        // Listener de INPUT atualizado para o campo de medicação
-        medicationInput.addEventListener('input', (e) => {
-            const query = e.target.value;
-            const confirmBtn = document.getElementById('confirm-med-name-btn');
-            clearTimeout(debounceTimer);
-
-            if (query.trim()) {
-                confirmBtn.classList.remove('hidden');
-            } else {
-                confirmBtn.classList.add('hidden');
-            }
-
-            if (query.length < 2) {
-                medicationAutocompleteList.classList.add('hidden');
-                return;
-            }
-
-            debounceTimer = setTimeout(async () => {
-                // ETAPA 1: Mostra o estado de carregamento
-                const onSelectCallback = (selectedValue) => {
-                    medicationInput.value = selectedValue;
-                    confirmBtn.classList.remove('hidden');
-                    hideActiveAutocomplete();
-                    medicationInput.focus();
-                };
-
-                renderAndPositionAutocomplete(
-                    medicationInput,
-                    medicationAutocompleteList,
-                    [],
-                    query,
-                    onSelectCallback,
-                    'loading'
-                );
-
-                // ETAPA 2: Lógica de busca
-                let allResults = [];
-                const directResults = await fetchMedicationSuggestions(query, medicationInput, medicationAutocompleteList, false);
-                allResults.push(...directResults);
-                
-                if (directResults.length === 0) {
-                    const geminiSearchTerms = await getVertexMedicationSuggestion(query);
-                    if (geminiSearchTerms.length > 0) {
-                        const geminiPromises = geminiSearchTerms.map(term => fetchMedicationSuggestions(term, medicationInput, medicationAutocompleteList, false));
-                        const geminiResults = (await Promise.all(geminiPromises)).flat();
-                        allResults.push(...geminiResults);
-                    }
-                }
-
-                const uniqueResults = [...new Set(allResults)];
-
-                // ETAPA 3: Renderiza o resultado final
-                renderAndPositionAutocomplete(
-                    medicationInput,
-                    medicationAutocompleteList,
-                    uniqueResults,
-                    query,
-                    // CORREÇÃO: A função onSelectCallback foi movida para cá para garantir que a lista feche
-                    (selectedValue) => { 
-                        medicationInput.value = selectedValue;
-                        document.getElementById('confirm-med-name-btn').classList.remove('hidden');
-                        hideActiveAutocomplete();
-                        medicationInput.focus();
-                    },
-                    uniqueResults.length > 0 ? 'has_results' : 'no_results'
-                );
-
-
-            }, 500);
-        });
-
         // Deleta um paciente (lógica com modal)
         deletePatientButton.addEventListener('click', () => {
             if (!currentPatientId) return;
@@ -4286,23 +4293,12 @@
             const openModule = document.querySelector('.module-editing');
             if (openModule && !e.target.closest('.module-editing')) {
 
-                // Condição especial para o Módulo de Medicações
-                if (openModule.id === 'module-medicacoes') {
-                    const medicationInput = document.getElementById('form-medications');
-                    const timeEditor = document.getElementById('medication-time-editor');
-
-                    // A mágica está aqui:
-                    // SÓ FECHA SE o input de busca estiver vazio E o editor de tempo não estiver ativo.
-                    if (medicationInput.value.trim() === '' && timeEditor.classList.contains('hidden')) {
-                        showMedicationEditor(false); // Reseta a UI interna do módulo
-                        exitEditMode(openModule);     // Remove a borda azul e o estado de edição
-                    }
                 } else {
                     // Comportamento padrão para todos os outros módulos
                     exitEditMode(openModule);
                 }
             }
-        });
+        );
 
         /**
          * Esconde a lista de autocomplete ou seletor customizado ativo,
@@ -4497,7 +4493,7 @@
                 const fugulinResult = calculateFugulin({
                     news2: news2Result,
                     dispositivos: devicesToSave,
-                    medicamentos: currentMedications,
+                    medicationsAdministered: administeredInShift,
                     consciencia: finalVitalsForSave.consciencia,
                     cuidadoCorporal: getFugulinScoreFromDOMorState('cuidadoCorporal'),
                     motilidade:     getFugulinScoreFromDOMorState('motilidade'),
@@ -4586,7 +4582,8 @@
                     news2: news2Result, // <- Agora usa a variável correta
                     fugulin: fugulinResult, // <- Agora usa a variável correta
                     risks: currentRisks,
-                    medications: currentMedications,
+                    medicationsAdministered: administeredInShift,
+                    newlyPrescribed: activePrescriptions.filter(p => !originalPatientState.activeMedicationPrescriptions?.some(op => op.id === p.id)),
                     examsDone: completedExamsThisShift,
                     diagnoses: currentDiagnoses,
                     comorbidities: currentComorbidities,
@@ -4639,6 +4636,7 @@
                     lastNews2Level: news2Result.level, // <- Agora usa a variável correta
                     lastFugulinScore: fugulinResult.score, // <- Agora usa a variável correta
                     lastFugulinClassification: fugulinResult.classification, // <- Agora usa a variável correta
+                    activeMedicationPrescriptions: activePrescriptions,
                     lastEvolution: evolutionText,
                     lastPendingObs: pendingObsText,
                     completedExams: arrayUnion(...completedExamsThisShift)
@@ -4706,42 +4704,6 @@
                 setUnsavedChanges(false);
             }
         });
-
-        medicationsListContainer.addEventListener('click', e => {
-            const medBlock = e.target.closest('.medication-block');
-            if (!medBlock) return;
-            const medName = medBlock.dataset.medName;
-
-            if (e.target.closest('.add-med-time-btn-emoji')) {
-                // Abre o editor de tempo para um card JÁ EXISTENTE
-                openMedTimePicker(medName, medBlock);
-            }
-            
-            // Lógica para o botão de excluir medicação
-            if (e.target.closest('.remove-med-btn')) {
-                // Pega as referências do editor de tempo
-                const timeEditor = document.getElementById('medication-time-editor');
-                const timeEditorLabel = document.getElementById('medication-time-editor-label');
-
-                // Verifica se o editor de tempo está visível
-                const isTimeEditorOpen = !timeEditor.classList.contains('hidden');
-
-                if (isTimeEditorOpen) {
-                    // Extrai o nome da medicação que está sendo editada no momento
-                    const currentlyEditingMedName = timeEditorLabel.textContent.replace('Selecione o horário para ', '');
-
-                    // Se a medicação que está sendo removida é a mesma que está sendo editada...
-                    if (medName === currentlyEditingMedName) {
-                        // ...então, retorna a UI para a etapa de busca de uma nova medicação.
-                        showMedicationEditor('search');
-                    }
-                }
-                currentMedications = currentMedications.filter(m => m.name !== medName);
-                medBlock.remove();
-                updateMedicationSummary('removeMedication');
-                setUnsavedChanges(true);
-            }
-        });
         
         /**
          * Listener global para detectar cliques fora de um módulo em edição.
@@ -4765,6 +4727,266 @@
         });
         
         // --- FUNÇÕES DE DADOS ---
+
+        /**
+         * Reseta e fecha o editor de medicações, voltando ao estado inicial.
+         */
+        function resetAndCloseMedicationEditor() {
+            medEditorArea.classList.add('hidden');
+            medMainActionArea.classList.remove('hidden');
+            
+            // Esconde o botão de deletar
+            document.getElementById('med-editor-delete-btn').classList.add('hidden');
+
+            // Limpa todos os campos
+            Object.values(medEditor).forEach(el => { if (el && el.value !== undefined) el.value = ''; });
+
+            // Esconde todos os passos e botões
+            Object.values(medSteps).forEach(el => el.classList.add('hidden'));
+
+            // Garante que o passo 1 (informações básicas) esteja visível por padrão ao reabrir
+            medSteps.step1.classList.remove('hidden');
+        }
+
+        /**
+         * Controla a visibilidade dos passos dentro do editor de medicação.
+         * @param {string} currentStep - O nome do passo a ser exibido.
+         */
+        function showMedicationEditorStep(currentStep) {
+            Object.entries(medSteps).forEach(([key, element]) => {
+                if (key === currentStep || currentStep.startsWith(key)) {
+                    element.classList.remove('hidden');
+                } else {
+                    element.classList.add('hidden');
+                }
+            });
+
+            // Mostra os botões de ação final apenas nos passos corretos
+            if (currentStep === 'step3b' || currentStep === 'step4') {
+                medSteps.actions.classList.remove('hidden');
+            } else {
+                medSteps.actions.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Renderiza um único item de medicação em uma das listas.
+         * @param {object} medDose - O objeto da dose a ser renderizada.
+         * @param {'active' | 'administered'} listType - O tipo de lista.
+         * @returns {HTMLElement} - O elemento do item da lista.
+         */
+        function createMedicationListItem(medDose, listType) {
+            const item = document.createElement('div');
+            item.className = 'medication-list-item';
+            item.dataset.doseId = medDose.id;
+
+            const now = new Date();
+            const isOverdue = listType === 'active' && medDose.time < now;
+            if (isOverdue) {
+                item.classList.add('is-overdue');
+            }
+
+            const timeString = medDose.time.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            const dateString = medDose.time.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+            let actionsHtml = '';
+                if (listType === 'active') {
+                    actionsHtml = `
+                        <button type="button" class="med-action-btn text-blue-600" data-action="edit" title="Editar Prescrição">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                        </button>
+                        <button type="button" class="med-action-btn text-green-600" data-action="administer" title="Administrar">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        </button>
+                    `;
+                } else { // 'administered'
+                    actionsHtml = `
+                        <button type="button" class="med-action-btn text-blue-600" data-action="add-dose" title="Adicionar outra dose">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" /></svg>
+                        </button>
+                        <button type="button" class="med-action-btn text-red-600" data-action="delete" title="Excluir Registro">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" /></svg>
+                        </button>
+                    `;
+                }
+
+            item.innerHTML = `
+                <div class="medication-list-item-header">
+                    <div>
+                        <p class="medication-list-item-name">${medDose.name}</p>
+                        <p class="medication-list-item-dose">${medDose.dose} <span class="text-blue-600 font-normal">${medDose.displayInfo || ''}</span></p>
+                    </div>
+                    <div class="medication-list-item-actions">
+                        ${actionsHtml}
+                    </div>
+                </div>
+                <p class="medication-list-item-time">
+                    ${isOverdue ? 'Atrasado - ' : ''}Horário: <strong>${timeString}</strong> (${dateString})
+                </p>
+            `;
+            return item;
+        }
+
+        /**
+         * Renderiza ambas as listas de medicação, mostrando apenas as doses relevantes.
+         */
+        function renderMedicationLists() {
+            const activeList = document.getElementById('active-prescriptions-list');
+            const administeredList = document.getElementById('administered-during-shift-list');
+
+            activeList.innerHTML = '';
+            administeredList.innerHTML = '';
+            const now = new Date();
+
+            // 1. Agrupa todas as doses ativas por sua prescrição
+            const prescriptions = activePrescriptions.reduce((acc, dose) => {
+                const id = dose.prescriptionId;
+                if (!acc[id]) {
+                    acc[id] = [];
+                }
+                acc[id].push(dose);
+                return acc;
+            }, {});
+
+            const dosesToRender = [];
+
+            // 2. Para cada prescrição, decide quais doses mostrar
+            for (const prescriptionId in prescriptions) {
+                const allDoses = prescriptions[prescriptionId].sort((a, b) => a.time.getTime() - b.time.getTime());
+                const overdueDoses = allDoses.filter(d => d.time < now);
+                const futureDoses = allDoses.filter(d => d.time >= now);
+
+                // Adiciona todas as doses atrasadas
+                dosesToRender.push(...overdueDoses);
+
+                // Adiciona apenas a próxima dose futura
+                if (futureDoses.length > 0) {
+                    const nextDose = futureDoses[0];
+                    // Adiciona informações extras para o card da próxima dose
+                    if (prescriptionId.startsWith('cont_')) {
+                        const lastDose = futureDoses[futureDoses.length - 1];
+                        const remainingDays = Math.ceil((lastDose.time.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        nextDose.displayInfo = `(a cada ${nextDose.frequency}h, por mais ${remainingDays} dia(s))`;
+                    }
+                    dosesToRender.push(nextDose);
+                }
+            }
+
+            // 3. Renderiza a lista de prescrições ativas filtrada
+            dosesToRender.sort((a, b) => a.time.getTime() - b.time.getTime());
+            dosesToRender.forEach(dose => {
+                activeList.appendChild(createMedicationListItem(dose, 'active'));
+            });
+
+            // 4. Renderiza a lista de administrados (sem alteração)
+            administeredInShift.sort((a, b) => b.time.getTime() - a.time.getTime());
+            administeredInShift.forEach(dose => {
+                administeredList.appendChild(createMedicationListItem(dose, 'administered'));
+            });
+        }
+
+        /**
+         * Abre o editor de medicações para editar uma prescrição existente.
+         * @param {string} prescriptionId - O ID da prescrição a ser editada.
+         */
+        function openMedicationEditorForEdit(prescriptionId) {
+            const allDosesForPrescription = activePrescriptions.filter(d => d.prescriptionId === prescriptionId);
+            if (allDosesForPrescription.length === 0) {
+                showToast("Erro: Prescrição não encontrada para edição.", "error");
+                return;
+            }
+
+            // Usa a primeira dose para dados básicos e a última para calcular a duração
+            const representativeDose = allDosesForPrescription[0];
+            const lastDose = allDosesForPrescription[allDosesForPrescription.length - 1];
+
+            resetAndCloseMedicationEditor();
+
+            // Preenche o editor com dados existentes
+            medEditor.id.value = prescriptionId;
+            medEditor.mode.value = 'edit';
+            medEditor.title.textContent = 'Editar Prescrição';
+            medEditor.name.value = representativeDose.name;
+            medEditor.dose.value = representativeDose.dose;
+
+            // Mostra o botão de suspender apenas no modo de edição
+            const deleteBtn = document.getElementById('med-editor-delete-btn');
+            deleteBtn.classList.remove('hidden');
+            deleteBtn.dataset.prescriptionId = prescriptionId; // Guarda o ID no botão
+
+            // Mostra o editor e o passo 1
+            medMainActionArea.classList.add('hidden');
+            medEditorArea.classList.remove('hidden');
+
+            // Se for dose única, vai para o passo de agendamento
+            if (prescriptionId.startsWith('single')) {
+                showMedicationEditorStep('step4');
+                medEditor.datetimeLabel.textContent = 'Reagendar Para';
+                flatpickr("#med-editor-datetime-input", { ...configAgendamento, defaultDate: representativeDose.time });
+            } else { // Se for de uso contínuo
+                showMedicationEditorStep('step3b');
+                const now = new Date();
+                const remainingDays = Math.ceil((lastDose.time.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+                medEditor.frequency.value = representativeDose.frequency || '';
+                medEditor.duration.value = remainingDays > 0 ? remainingDays : 1; // Mostra pelo menos 1 dia
+
+                flatpickr("#med-editor-start-time", { ...configAgendamento, defaultDate: representativeDose.time });
+            }
+        }
+        /**
+         * Simula a busca por todas as medicações agendadas e atrasadas da unidade.
+         * ESTA FUNÇÃO SERÁ SUBSTITUÍDA PELA LÓGICA REAL NO FUTURO.
+         * @returns {Promise<Array>} Uma promessa que resolve para um array de objetos de medicação.
+         */
+        async function getUpcomingAndOverdueMedications() {
+            console.log("Buscando medicações da unidade (usando dados de exemplo)...");
+            // Simulação: Pegar todos os pacientes e verificar suas prescrições
+            // Por agora, vamos retornar um array fixo para testar a UI.
+            const now = new Date().getTime();
+            const oneHour = 60 * 60 * 1000;
+
+            // Encontra pacientes na lista atual para usar nomes e leitos reais
+            const patient1 = currentPatientList[0];
+            const patient2 = currentPatientList[1];
+
+            const mockMedications = [];
+
+            if (patient1) {
+                mockMedications.push({
+                    patientId: patient1.id,
+                    patientName: patient1.name,
+                    roomNumber: patient1.roomNumber,
+                    patientNumber: patient1.patientNumber,
+                    medicationName: 'Dipirona 500mg',
+                    dose: '1 cp',
+                    time: new Date(now - (2 * oneHour)), // Atrasado 2 horas
+                });
+            }
+
+            if (patient2) {
+                mockMedications.push({
+                    patientId: patient2.id,
+                    patientName: patient2.name,
+                    roomNumber: patient2.roomNumber,
+                    patientNumber: patient2.patientNumber,
+                    medicationName: 'Amoxicilina 250mg',
+                    dose: '5 ml',
+                    time: new Date(now + (1 * oneHour)), // Daqui a 1 hora
+                });
+                mockMedications.push({
+                    patientId: patient2.id,
+                    patientName: patient2.name,
+                    roomNumber: patient2.roomNumber,
+                    patientNumber: patient2.patientNumber,
+                    medicationName: 'Losartana 50mg',
+                    dose: '1 cp',
+                    time: new Date(now + (3 * oneHour)), // Daqui a 3 horas
+                });
+            }
+
+            return mockMedications;
+        }
 
         /**
          * Limpa todos os campos de entrada e exibição dentro do módulo de Monitoramento.
@@ -4945,8 +5167,11 @@
                         break;
 
                     case 'medicacoes':
-                        if (h.medications && h.medications.length > 0) {
-                            moduleEntryContent = `<ul class="list-disc pl-5">${h.medications.map(m => `<li>Administrado <strong>${m.name}</strong> às ${m.times.map(ts => new Date(ts).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})).join(', ')}</li>`).join('')}</ul>`;
+                        if (h.medicationsAdministered && h.medicationsAdministered.length > 0) {
+                            moduleEntryContent += `<div><strong>Administrações no plantão:</strong><ul class="list-disc pl-5">${h.medicationsAdministered.map(m => `<li><strong>${m.name} ${m.dose}</strong> às ${formatDate(m.time)}</li>`).join('')}</ul></div>`;
+                        }
+                        if (h.newlyPrescribed && h.newlyPrescribed.length > 0) {
+                            moduleEntryContent += `<div class="mt-2"><strong>Novas Prescrições:</strong><ul class="list-disc pl-5">${h.newlyPrescribed.map(m => `<li><strong>${m.name} ${m.dose}</strong> - Início em ${formatDate(m.time)}</li>`).join('')}</ul></div>`;
                         }
                         break;
 
@@ -5303,7 +5528,7 @@
             const fugulinData = {
                 news2: news2Result,
                 dispositivos: Array.from(document.querySelectorAll('#dispositivos-grid input[type="checkbox"]:checked')).map(chk => chk.value),
-                medicamentos: currentMedications,
+                medicamentos: activePrescriptions,
                 consciencia: finalVitals.consciencia,
                 cuidadoCorporal: getFugulinScoreFromDOMorState('cuidadoCorporal'),
                 motilidade:     getFugulinScoreFromDOMorState('motilidade'),
@@ -5895,180 +6120,6 @@
             container.innerHTML = `<p class="font-semibold text-blue-700">Às ${summaryParts.join(' | ')}</p>`;
         }
 
-        // Cria o Card de Medicação
-        function createMedicationCard(medObject) {
-            const container = medicationsListContainer;
-            const block = document.createElement('div');
-            block.className = 'medication-block';
-            block.dataset.medName = medObject.name;
-
-            block.innerHTML = `
-                <div class="flex-grow">
-                    <p class="font-bold text-gray-800">${medObject.name}</p>
-                    <div class="med-times-display text-xs text-gray-500 mt-1">
-                    </div>
-                </div>
-                <div class="med-actions">
-                    
-                    <button type="button" class="add-med-time-btn-emoji text-blue-600 hover:text-blue-800 transition-colors" title="Outro horário">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                        </svg>
-                    </button>
-                    <button type="button" class="remove-med-btn text-red-500 hover:text-red-700 transition-colors" title="Excluir Medicação">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
-                        <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                </div>
-            `;
-            container.appendChild(block);
-
-            const timesContainer = block.querySelector('.med-times-display');
-            renderMedicationTimes(medObject, timesContainer); // Renderiza o estado inicial ("Nenhum horário...")
-
-            return block;
-        }
-
-        /**
-         * Abre o seletor de tempo, implementa a lógica de data e atualiza o card.
-         * Agora com opções para "Adicionar" um novo horário ou "Corrigir" o último.
-         * @param {string} medName - O nome do medicamento.
-         * @param {HTMLElement} medBlock - O elemento do card da medicação.
-         */
-        function openMedTimePicker(medName, medBlock) {
-            const medObject = currentMedications.find(m => m.name === medName);
-            if (!medObject) {
-                console.error("Objeto da medicação não encontrado para:", medName);
-                return;
-            }
-            enterEditMode(document.getElementById('module-medicacoes'));
-
-            // Mostra a UI do editor de tempo
-            showMedicationEditor('time');
-            scrollToModule(document.getElementById('module-medicacoes'));
-            document.getElementById('medication-time-editor-label').textContent = `Selecione o horário para ${medName}`;
-
-
-            const timePickerContainer = document.getElementById('inline-time-picker-container');
-            
-            // NOVO: Referências aos novos botões
-            const correctBtn = document.getElementById('correct-med-time-btn');
-            const addBtn = document.getElementById('add-med-time-btn');
-            
-            let selectedTimestamp = null;
-            let fpInstance = null;
-
-            timePickerContainer.innerHTML = '';
-
-            // Lógica para finalizar a edição (comum a ambos os botões)
-            const finalizeTimeEdit = () => {
-                const timesContainer = medBlock.querySelector('.med-times-display');
-                if (timesContainer) {
-                    renderMedicationTimes(medObject, timesContainer);
-                }
-
-                updateMedicationSummary('updateMedicationTime');
-                setUnsavedChanges(true);
-                
-                if (fpInstance) fpInstance.destroy();
-                showMedicationEditor(false);
-                exitEditMode(document.getElementById('module-medicacoes'));
-            };
-            
-            // Usando o truque de clonagem para evitar múltiplos listeners
-            const newCorrectBtn = correctBtn.cloneNode(true);
-            const newAddBtn = addBtn.cloneNode(true);
-            correctBtn.parentNode.replaceChild(newCorrectBtn, correctBtn);
-            addBtn.parentNode.replaceChild(newAddBtn, addBtn);
-
-            // Lógica do botão "Corrigir"
-            newCorrectBtn.addEventListener('click', () => {
-                if (!selectedTimestamp) selectedTimestamp = new Date().getTime();
-                
-                // A mágica está aqui: substitui o ÚLTIMO item do array
-                if (medObject.times.length > 0) {
-                    medObject.times[medObject.times.length - 1] = selectedTimestamp;
-                }
-                finalizeTimeEdit();
-            });
-
-            // Lógica do botão "Adicionar"
-            newAddBtn.addEventListener('click', () => {
-                if (!selectedTimestamp) selectedTimestamp = new Date().getTime();
-                
-                // Apenas adiciona um novo item ao array
-                medObject.times.push(selectedTimestamp);
-                finalizeTimeEdit();
-            });
-
-            // NOVO: Mostra o botão "Corrigir" apenas se já houver horários
-            if (medObject.times.length > 0) {
-                newCorrectBtn.classList.remove('hidden');
-            } else {
-                newCorrectBtn.classList.add('hidden');
-            }
-
-            // Configuração do Flatpickr (seletor de tempo)
-            fpInstance = flatpickr(timePickerContainer, {
-                enableTime: true,
-                noCalendar: true,
-                dateFormat: "H:i",
-                time_24hr: true,
-                minuteIncrement: 5,
-                locale: "pt",
-                inline: true,
-                defaultDate: new Date(),
-                onChange: (selectedDates) => {
-                    if (selectedDates.length > 0) {
-                        const now = new Date();
-                        const selectedTime = selectedDates[0];
-                        
-                        let finalDateTime = new Date(
-                            now.getFullYear(), now.getMonth(), now.getDate(),
-                            selectedTime.getHours(), selectedTime.getMinutes()
-                        );
-
-                        if (finalDateTime.getTime() > now.getTime()) {
-                            finalDateTime.setDate(finalDateTime.getDate() - 1);
-                        }
-                        
-                        selectedTimestamp = finalDateTime.getTime();
-                    }
-                }
-            });
-        }
-
-        /**
-         * Função central para lidar com a seleção de uma nova medicação ou adicionar um novo horário a uma existente.
-         * @param {string} medName - O nome do medicamento selecionado.
-         */
-        function handleMedicationSelection(medName) {
-            // 1. Procura se a medicação já existe no estado da aplicação.
-            let medObject = currentMedications.find(m => m.name === medName);
-            let medBlock;
-
-            if (medObject) {
-                // 2. Se JÁ EXISTE: encontra o card (elemento HTML) correspondente no DOM.
-                medBlock = medicationsListContainer.querySelector(`.medication-block[data-med-name="${medName}"]`);
-            } else {
-                // 3. Se NÃO EXISTE: cria um novo objeto, adiciona ao estado e cria um novo card.
-                medObject = { name: medName, times: [] };
-                currentMedications.push(medObject);
-                medBlock = createMedicationCard(medObject);
-            }
-
-            // 4. Verifica se o card foi encontrado ou criado com sucesso.
-            if (!medBlock) {
-                showToast("Ocorreu um erro ao tentar adicionar a medicação.", "error");
-                console.error("Não foi possível encontrar ou criar o medBlock para:", medName);
-                return;
-            }
-
-            // 5. Abre o seletor de tempo para o card (seja ele novo ou existente).
-            openMedTimePicker(medName, medBlock);
-        }
-
         function renderRecentMedications(handovers) {
             recentMedsList.innerHTML = '';
             const meds24h = new Map();
@@ -6133,6 +6184,7 @@
                 currentPatientList = initialPatients;
                 
                 sortAndRenderPatientList();
+                updatePatientCardMedicationStatus();
                 
                 if (initialPatients.length < PATIENTS_PER_PAGE) {
                     allPatientsLoaded = true;
@@ -6337,6 +6389,42 @@
             renderPatientList(currentPatientList);
         }
 
+        /**
+         * Verifica as medicações de todos os pacientes e atualiza a UI do painel.
+         * (ESTA É UMA SIMULAÇÃO E SERÁ MELHORADA)
+         */
+        async function updatePatientCardMedicationStatus() {
+            const allMeds = await getUpcomingAndOverdueMedications();
+            const now = new Date();
+            const overduePatientIds = new Set();
+            let hasAnyOverdue = false;
+
+            allMeds.forEach(med => {
+                if (med.time < now) {
+                    overduePatientIds.add(med.patientId);
+                    hasAnyOverdue = true;
+                }
+            });
+
+            // Atualiza o ícone global de alerta
+            if (hasAnyOverdue) {
+                showUnitMedicationsButton.classList.add('has-overdue');
+                medicationAlertIndicator.classList.remove('hidden');
+            } else {
+                showUnitMedicationsButton.classList.remove('has-overdue');
+                medicationAlertIndicator.classList.add('hidden');
+            }
+
+            // Atualiza cada card de paciente
+            document.querySelectorAll('.patient-card, .patient-list-item').forEach(card => {
+                const patientId = card.dataset.id;
+                if (overduePatientIds.has(patientId)) {
+                    card.classList.add('overdue-medication');
+                } else {
+                    card.classList.remove('overdue-medication');
+                }
+            });
+        }
 
         /**
          * Renderiza a lista COMPLETA de pacientes no DOM, limpando o conteúdo anterior.
@@ -6684,6 +6772,8 @@
 
         // Esta função cria o registro no histórico e chama a função de renderização.
         async function showPatientDetail(patientId, preloadedData = null, fromHistory = false) {
+            // Limpa o timer de atualização de medicação anterior, se existir
+            if (medicationUITimer) clearInterval(medicationUITimer);
             // Se não estivermos vindo do histórico (ou seja, foi um clique do usuário),
             // criamos uma nova entrada no histórico.
             if (!fromHistory) {
@@ -6750,6 +6840,18 @@
                     monitoring: lastHandoverWithMonitoring ? lastHandoverWithMonitoring.monitoring : {}
 
                 };
+                
+                // Limpa os arrays de estado de medicação antes de preencher
+                activePrescriptions = [];
+                administeredInShift = [];
+
+                // Carrega as prescrições ativas do paciente, convertendo timestamps do Firestore para objetos Date
+                if (patientData.activeMedicationPrescriptions) {
+                    activePrescriptions = patientData.activeMedicationPrescriptions.map(med => ({
+                        ...med,
+                        time: med.time.toDate ? med.time.toDate() : new Date(med.time)
+                    }));
+                }
 
                 // Preenche os detalhes do cabeçalho
                 patientDetailName.textContent = truncateNameByWords(patientData.name);
@@ -6870,6 +6972,10 @@
 
                 showScreen('patientDetail');
                 loadHandovers(patientId);
+                
+                // Inicia um timer para atualizar a UI de medicações a cada minuto
+                medicationUITimer = setInterval(renderMedicationLists, 60000);
+
             } catch (error) {
                 console.error("Erro ao carregar detalhes do paciente:", error);
                 showToast('Erro ao carregar detalhes do paciente.', 'error');
@@ -7542,9 +7648,17 @@
             </div>`;
 
             // Seção: Medicações
+            let medsHtml = '';
+            if (handover.medicationsAdministered?.length > 0) {
+                medsHtml += `<div class="summary-item"><span class="summary-item-label">Administradas no Plantão:</span><div class="summary-item-value"><ul>${handover.medicationsAdministered.map(m => `<li><strong>${m.name} ${m.dose}</strong> (às ${new Date(m.time).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})})</li>`).join('')}</ul></div></div>`;
+            }
+            if (handover.newlyPrescribed?.length > 0) {
+                medsHtml += `<div class="summary-item"><span class="summary-item-label">Novas Prescrições Iniciadas:</span><div class="summary-item-value"><ul>${handover.newlyPrescribed.map(m => `<li><strong>${m.name} ${m.dose}</strong></li>`).join('')}</ul></div></div>`;
+            }
+
             contentHtml += `<div class="summary-section">
-                <h3 class="summary-section-header">💉 Medicações do Plantão</h3>
-                <div class="summary-item-value">${handover.medications && handover.medications.length > 0 ? `<ul>${handover.medications.map(m => `<li><strong>${m.name}</strong> às ${m.times.map(ts => new Date(ts).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})).join(', ')}</li>`).join('')}</ul>` : '<span class="text-gray-500 text-xs italic">Nenhuma medicação administrada.</span>'}</div>
+                <h3 class="summary-section-header">💉 Medicações</h3>
+                ${medsHtml || '<span class="text-gray-500 text-xs italic">Nenhuma atividade de medicação registrada.</span>'}
             </div>`;
 
             // Seção: Exames e Procedimentos
@@ -8048,6 +8162,227 @@
 
         // --- INICIALIZAÇÃO DA APLICAÇÃO ---
         function main() {
+            
+        // LÓGICA DO POPUP DE CONFIRMAÇÃO
+
+        const aiPopup = document.getElementById('ai-confirmation-popup');
+        const cancelPopupButton = document.getElementById('cancel-ai-popup');
+        const confirmPopupButton = document.getElementById('confirm-ai-popup');
+
+        function openConfirmationPopup(data) {
+            const form = document.getElementById('ai-confirmation-form');
+            const noDataMessage = document.getElementById('ai-popup-no-data');
+            const confirmButton = document.getElementById('confirm-ai-popup');
+
+            // A função auxiliar agora é definida no início, antes de qualquer chamada.
+            const createRecommendationCard = (rec) => `
+                <div class="recommendation-card">
+                    <p class="recommendation-header">${rec.categoria}</p>
+                    <p class="recommendation-body">
+                        Altere para: <strong>"${rec.recomendacao}"</strong>
+                    </p>
+                </div>
+            `;
+            
+            // Função auxiliar para verificar, preencher e exibir um campo
+            const setupField = (fieldName, dataValue) => {
+                const container = document.getElementById(`popup-${fieldName}-container`);
+                const input = document.getElementById(`popup-${fieldName}`);
+
+                // Apenas o input é estritamente necessário para guardar o valor
+                if (!input) {
+                    return false;
+                }
+
+                // Verifica se o valor recebido é útil (não nulo ou vazio)
+                if (dataValue && String(dataValue).trim() !== '') {
+                    input.value = String(dataValue).trim();
+
+                    // Se existe um container para este campo, garante que ele esteja visível
+                    if (container) {
+                        container.classList.remove('hidden');
+                    }
+                    return true; // Sinaliza que encontrou e preencheu conteúdo
+                }
+
+                // Se não há valor, garante que o container (se existir) fique escondido
+                if (container) {
+                    container.classList.add('hidden');
+                }
+                return false; // Sinaliza que não há conteúdo
+            };
+
+            // Verifica se os dados são nulos ou se o objeto está vazio (sem chaves próprias)
+            if (!data || Object.keys(data).length === 0) {
+                form.classList.add('hidden'); // Esconde o formulário
+                noDataMessage.classList.remove('hidden'); // Mostra a mensagem de erro
+                confirmButton.disabled = true; // Desabilita o botão de confirmar
+            } else {
+                form.classList.remove('hidden'); // Mostra o formulário
+                noDataMessage.classList.add('hidden'); // Esconde a mensagem de erro
+                confirmButton.disabled = false; // Habilita o botão de confirmar
+            }
+
+            form.reset();
+            document.querySelectorAll('.popup-module-card').forEach(card => card.classList.add('hidden'));
+
+            // Módulo: Diagnóstico e Observações
+            const diagnosticoModule = document.getElementById('popup-module-diagnostico');
+            if (diagnosticoModule) {
+                let hasContent = false; // Começa presumindo que não há conteúdo
+
+                // Verifica cada campo. O '||' garante que se 'hasContent' se tornar true uma vez, ele permanecerá true.
+                hasContent = setupField('diagnostico', data.diagnostico) || hasContent;
+                hasContent = setupField('comorbidades', data.comorbidades) || hasContent;
+                hasContent = setupField('alergias', data.alergias) || hasContent;
+                hasContent = setupField('observacoes', data.observacoes) || hasContent;
+
+                // Se qualquer um dos campos acima tiver conteúdo, a flag 'hasContent' será true.
+                if (hasContent) {
+                    diagnosticoModule.classList.remove('hidden'); // Mostra o módulo
+                } else {
+                    diagnosticoModule.classList.add('hidden'); // Garante que ele fique oculto se estiver vazio
+                }
+            }
+
+            // Módulo: Sinais Vitais e Monitoramento
+            if (data.sinaisVitais || data.usoO2 || data.outrosMonitoramento) {
+                const module = document.getElementById('popup-module-sv');
+                module.classList.remove('hidden');
+                if (data.sinaisVitais) {
+                    // CORREÇÃO: Aceita tanto 'pa' quanto 'pressaoArterial' como chave para Pressão Arterial.
+                    if (data.sinaisVitais.pa || data.sinaisVitais.pressaoArterial) {
+                        module.querySelector('#popup-pa').value = data.sinaisVitais.pa || data.sinaisVitais.pressaoArterial;
+                    }
+                    if (data.sinaisVitais.fc) module.querySelector('#popup-fc').value = data.sinaisVitais.fc;
+                    if (data.sinaisVitais.fr) module.querySelector('#popup-fr').value = data.sinaisVitais.fr;
+                    if (data.sinaisVitais.temp) module.querySelector('#popup-temp').value = data.sinaisVitais.temp;
+                    if (data.sinaisVitais.sat) module.querySelector('#popup-sat').value = data.sinaisVitais.sat;
+                    if (data.sinaisVitais.glicemia) module.querySelector('#popup-glicemia').value = data.sinaisVitais.glicemia;
+                }
+                if (data.outrosMonitoramento) module.querySelector('#popup-outros-monitoramento').value = data.outrosMonitoramento;
+                if (data.usoO2) module.querySelector('#popup-uso-o2').checked = true;
+            }
+
+            // Módulo: Dispositivos
+            if (data.dispositivos && data.dispositivos.length > 0) {
+                const module = document.getElementById('popup-module-dispositivos');
+                const container = document.getElementById('popup-devices-list');
+                module.classList.remove('hidden');
+                container.innerHTML = '';
+
+                data.dispositivos.forEach((device, index) => {
+                    const inputId = `popup-device-input-${index}`;
+                    let suggestionHtml = '';
+                    if (device.suggestion) {
+                        suggestionHtml = `
+                            <button type="button" class="device-suggestion-button" data-target-input="${inputId}" data-suggestion="${device.suggestion}">
+                                Usar "${device.suggestion}"?
+                            </button>
+                        `;
+                    }
+                    const itemHtml = `
+                        <div class="device-suggestion-wrapper">
+                            <input type="text" id="${inputId}" value="${device.transcribed || ''}" class="w-full text-sm">
+                            ${suggestionHtml}
+                        </div>
+                    `;
+                    container.innerHTML += itemHtml;
+                });
+            }
+            
+            // Módulo: Medicações
+            
+            // Módulo: Exames
+            if (data.exames && data.exames.length > 0) {
+                const module = document.getElementById('popup-module-exames');
+                module.classList.remove('hidden');
+                const examsContainer = module.querySelector('#popup-exames-list');
+                examsContainer.innerHTML = '';
+                const now = new Date();
+                data.exames.forEach(exam => {
+                    const localDateTime = exam.dataHora ? exam.dataHora.replace(' ', 'T') : '';
+                    const examDate = exam.dataHora ? new Date(exam.dataHora.replace(' ', 'T')) : now;
+
+                    const resultInputHtml = examDate <= now 
+                        ? `<input type="text" data-type="exam-result" value="${exam.resultado || ''}" class="w-full text-sm" placeholder="Resultado (se houver)">`
+                        : `<input type="text" data-type="exam-result" value="" class="w-full text-sm bg-gray-100" placeholder="Agendado" disabled>`;
+
+                    const itemHtml = `<div class="p-2 border rounded-md bg-gray-50 space-y-2"><input type="text" data-type="exam-name" value="${exam.descricao || ''}" class="w-full text-sm font-semibold" placeholder="Nome do exame"><div class="grid grid-cols-2 gap-2"><input type="datetime-local" data-type="exam-datetime" value="${localDateTime}" class="w-full text-sm">${resultInputHtml}</div></div>`;
+                    examsContainer.innerHTML += itemHtml;
+                });
+            }
+
+            // Módulo: Recomendações de Riscos
+            if (data.sugestoesRiscos && data.sugestoesRiscos.length > 0) {
+                const module = document.getElementById('popup-module-riscos');
+                const container = document.getElementById('popup-risks-recommendations');
+                module.classList.remove('hidden');
+                container.innerHTML = data.sugestoesRiscos.map(createRecommendationCard).join('');
+            }
+
+            // Módulo: Recomendações de Cuidados
+            if (data.sugestoesCuidados && data.sugestoesCuidados.length > 0) {
+                const module = document.getElementById('popup-module-cuidados-sugestoes');
+                const container = document.getElementById('popup-care-recommendations');
+                module.classList.remove('hidden');
+                container.innerHTML = data.sugestoesCuidados.map(createRecommendationCard).join('');
+            }
+            
+            aiPopup.classList.remove('hidden');
+            aiPopup.classList.add('flex');
+        }
+
+        /**
+        * Fecha o popup de confirmação.
+        */
+        function closeConfirmationPopup() {
+            aiPopup.classList.add('hidden');
+            aiPopup.classList.remove('flex');
+        }
+
+        // Adiciona eventos de clique aos botões do popup
+        cancelPopupButton.addEventListener('click', closeConfirmationPopup);
+        // Adiciona o evento de clique ao botão de confirmação
+        confirmPopupButton.addEventListener('click', () => {
+            // 1. Coleta os dados editados pelo usuário no popup
+            const devicesString = Array.from(document.querySelectorAll('#popup-devices-list input[type="text"]'))
+                .map(input => input.value.trim())
+                .filter(value => value) // Remove valores vazios
+                .join(', ');
+            const dataFromPopup = {
+                diagnostico: document.getElementById('popup-diagnostico').value,
+                comorbidades: document.getElementById('popup-comorbidades').value,
+                alergias: document.getElementById('popup-alergias').value,
+                observacoes: document.getElementById('popup-observacoes').value,
+                sinaisVitais: {
+                    pa: document.getElementById('popup-pa').value,
+                    fc: document.getElementById('popup-fc').value,
+                    fr: document.getElementById('popup-fr').value,
+                    temp: document.getElementById('popup-temp').value,
+                    sat: document.getElementById('popup-sat').value,
+                    glicemia: document.getElementById('popup-glicemia').value
+                },
+                usoO2: document.getElementById('popup-uso-o2').checked,
+                outrosMonitoramento: document.getElementById('popup-outros-monitoramento').value,
+                dispositivos: devicesString,
+                medicamentos: Array.from(document.querySelectorAll('#popup-medicamentos-list > div')).map(div => ({
+                    nome: div.querySelector('[data-type="med-name"]').value,
+                    horario: div.querySelector('[data-type="med-time"]').value
+                })),
+                exames: Array.from(document.querySelectorAll('#popup-exames-list > div')).map(div => ({
+                    nome: div.querySelector('[data-type="exam-name"]').value,
+                    dataHora: (div.querySelector('[data-type="exam-datetime"]').value || '').replace('T', ' '),
+                    resultado: div.querySelector('[data-type="exam-result"]').value
+                })),
+            };
+
+            // 2. Chama a função para preencher o formulário principal COM os dados
+            autofillMainForm(dataFromPopup);
+            
+            // 3. Fecha o popup
+            closeConfirmationPopup();
+        });
 
         // Listener para controlar a navegação entre páginas do navegador
         window.addEventListener('popstate', (event) => {
@@ -8109,6 +8444,227 @@
                 const { notifId, patientId, handoverId } = item.dataset;
                 handleNotificationClick(notifId, patientId, handoverId);
             }
+        });
+
+        document.getElementById('add-new-medication-btn').addEventListener('click', () => {
+            resetAndCloseMedicationEditor(); // Garante que o editor esteja limpo
+            medEditor.mode.value = 'new';
+            medEditor.title.textContent = 'Adicionar Nova Medicação';
+            medMainActionArea.classList.add('hidden');
+            medEditorArea.classList.remove('hidden');
+            medSteps.step1.classList.remove('hidden');
+            medEditor.name.focus();
+        });
+
+        medEditorCloseBtn.addEventListener('click', resetAndCloseMedicationEditor);
+
+        // Navegação para frente no editor
+        medEditor.name.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (medEditor.name.value.trim() && medEditor.dose.value.trim()) {
+                    showMedicationEditorStep('step2');
+                } else {
+                    medEditor.dose.focus();
+                }
+            }
+        });
+        medEditor.dose.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (medEditor.name.value.trim() && medEditor.dose.value.trim()) {
+                    showMedicationEditorStep('step2');
+                }
+            }
+        });
+
+        // Seleção de tipo de medicação
+        medEditorArea.addEventListener('click', (e) => {
+            const typeBtn = e.target.closest('.med-type-btn');
+            if (typeBtn) {
+                const type = typeBtn.dataset.type;
+                if (type === 'single') {
+                    showMedicationEditorStep('step3a');
+                } else { // continuous
+                    showMedicationEditorStep('step3b');
+                    flatpickr("#med-editor-start-time", configAgendamento);
+                }
+            }
+
+            const actionBtn = e.target.closest('.med-single-action-btn');
+            if (actionBtn) {
+                const action = actionBtn.dataset.action;
+                medEditor.mode.value = action; // 'schedule' or 'register'
+                showMedicationEditorStep('step4');
+                const config = action === 'schedule' ? configAgendamento : configRegistro;
+                medEditor.datetimeLabel.textContent = action === 'schedule' ? 'Agendar Para' : 'Registrado Em';
+                flatpickr("#med-editor-datetime-input", config);
+            }
+        });
+
+        // Botão de voltar do editor
+        medEditor.backBtn.addEventListener('click', () => {
+            // Lógica simples para voltar um passo (pode ser aprimorada se necessário)
+            if (!medSteps.step4.classList.contains('hidden')) {
+                showMedicationEditorStep('step3a'); // Volta para a escolha de ação
+            } else if (!medSteps.step3a.classList.contains('hidden') || !medSteps.step3b.classList.contains('hidden')) {
+                showMedicationEditorStep('step2');
+            } else if (!medSteps.step2.classList.contains('hidden')) {
+                showMedicationEditorStep('step1');
+            }
+        });
+
+        // Botão de salvar
+        medEditor.saveBtn.addEventListener('click', () => {
+            const name = medEditor.name.value.trim();
+            const dose = medEditor.dose.value.trim();
+            const prescriptionId = medEditor.id.value;
+            const isEditing = medEditor.mode.value === 'edit';
+
+            // Se estiver editando, remove todas as doses futuras da prescrição antiga
+            if (isEditing) {
+                const now = new Date();
+                activePrescriptions = activePrescriptions.filter(d => 
+                    d.prescriptionId !== prescriptionId || d.time < now // Mantém as atrasadas
+                );
+            }
+
+            // Lógica para Dose Única
+            if (medEditor.mode.value === 'schedule' || medEditor.mode.value === 'register' || (isEditing && prescriptionId.startsWith('single'))) {
+                const date = parseBrazilianDateTime(medEditor.datetimeInput.value);
+                const newDose = {
+                    id: `med_${date.getTime()}`,
+                    name,
+                    dose,
+                    time: date,
+                    // Define um ID diferente para doses "Registrar Agora"
+                    prescriptionId: isEditing ? prescriptionId : (medEditor.mode.value === 'register' ? `single_now_${Date.now()}` : `single_${Date.now()}`)
+                };
+
+                if (medEditor.mode.value === 'register') {
+                    administeredInShift.push(newDose);
+                } else { // schedule
+                    activePrescriptions.push(newDose);
+                }
+            }
+
+            // Lógica para Uso Contínuo (Posologia)
+            if (!medSteps.step3b.classList.contains('hidden')) {
+                const startDate = parseBrazilianDateTime(medEditor.startTime.value);
+                const frequency = parseInt(medEditor.frequency.value, 10);
+                const duration = parseInt(medEditor.duration.value, 10);
+                const newPrescriptionId = isEditing ? prescriptionId : `cont_${Date.now()}`;
+
+                if (frequency > 0 && duration > 0) {
+                    for (let d = 0; d < duration; d++) {
+                        for (let h = 0; h < 24; h += frequency) {
+                            let doseTime = new Date(startDate);
+                            doseTime.setDate(startDate.getDate() + d);
+                            doseTime.setHours(startDate.getHours() + h);
+
+                            // Ao editar, só adiciona doses a partir de agora
+                            if (!isEditing || doseTime >= new Date()) {
+                                activePrescriptions.push({
+                                    id: `med_${doseTime.getTime()}`,
+                                    name,
+                                    dose,
+                                    time: doseTime,
+                                    prescriptionId: newPrescriptionId,
+                                    frequency: frequency, // Salva a frequência no objeto da dose
+                                    duration: duration // Salva a duração no objeto da dose
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            renderMedicationLists();
+            resetAndCloseMedicationEditor();
+            setUnsavedChanges(true);
+        });
+
+        document.getElementById('module-medicacoes').addEventListener('click', (e) => {
+            const actionBtn = e.target.closest('.med-action-btn');
+            if (!actionBtn) return;
+
+            const listItem = actionBtn.closest('.medication-list-item');
+            const doseId = listItem.dataset.doseId;
+            const action = actionBtn.dataset.action;
+
+            if (action === 'administer') {
+                const doseToAdminister = activePrescriptions.find(d => d.id === doseId);
+                if (doseToAdminister) {
+                    // Preenche o modal de confirmação
+                    administerMedConfirmModal.querySelector('#administer-med-confirm-text strong').textContent = `${doseToAdminister.name} ${doseToAdminister.dose}`;
+                    confirmAdministerMedButton.dataset.doseId = doseId;
+                    administerMedConfirmModal.classList.remove('hidden');
+                }
+            }
+
+            if (action === 'add-dose') {
+                const originalDose = administeredInShift.find(d => d.id === doseId);
+                if (originalDose) {
+                    const newDose = {
+                        ...originalDose, // Copia nome, dose, etc.
+                        id: `med_${Date.now()}`,
+                        time: new Date(), // Usa o horário atual
+                    };
+                    administeredInShift.push(newDose);
+                    renderMedicationLists();
+                    setUnsavedChanges(true);
+                    showToast(`Nova dose de ${newDose.name} registrada.`, 'success');
+                }
+            }
+
+            if (action === 'edit') {
+                const dose = activePrescriptions.find(d => d.id === doseId);
+                if (dose && dose.prescriptionId) {
+                    openMedicationEditorForEdit(dose.prescriptionId);
+                }
+            }
+
+            if (action === 'delete') {
+                    const doseIndex = administeredInShift.findIndex(d => d.id === doseId);
+                    if (doseIndex > -1) {
+                        const [deletedDose] = administeredInShift.splice(doseIndex, 1);
+
+                        // Verifica se a dose veio de uma prescrição persistente (não de 'Registrar Agora')
+                        if (deletedDose.prescriptionId && !deletedDose.prescriptionId.startsWith('single_now')) {
+                            // Devolve para a lista de prescrições ativas
+                            activePrescriptions.push(deletedDose);
+                            showToast(`Administração de ${deletedDose.name} revertida.`, 'warning');
+                        } else {
+                            showToast(`Registro de ${deletedDose.name} removido.`, 'success');
+                        }
+
+                        renderMedicationLists();
+                        setUnsavedChanges(true);
+                    }
+                }
+        });
+
+        // Botões do modal de confirmação de administração de medicação
+        cancelAdministerMedButton.addEventListener('click', () => {
+            administerMedConfirmModal.classList.add('hidden');
+        });
+
+        confirmAdministerMedButton.addEventListener('click', () => {
+            const doseId = confirmAdministerMedButton.dataset.doseId;
+            const doseIndex = activePrescriptions.findIndex(d => d.id === doseId);
+
+            if (doseIndex > -1) {
+                // Remove a dose da lista de ativas e a adiciona na lista de administradas
+                const [administeredDose] = activePrescriptions.splice(doseIndex, 1);
+                administeredDose.time = new Date(); // Atualiza para o horário exato da administração
+                administeredInShift.push(administeredDose);
+
+                renderMedicationLists();
+                setUnsavedChanges(true);
+                showToast(`${administeredDose.name} administrado com sucesso!`, 'success');
+            }
+
+            administerMedConfirmModal.classList.add('hidden');
         });
 
         // Fecha o painel se clicar em qualquer outro lugar
@@ -8284,37 +8840,8 @@
 
             if (addNewMedicationBtn) {
                 addNewMedicationBtn.addEventListener('click', () => {
-                    showMedicationEditor('search'); // Mostra o editor de BUSCA
                     enterEditMode(moduleMedicacoes);
                     scrollToModule(moduleMedicacoes); // << LINHA ADICIONADA
-                });
-            }
-
-            if (cancelEditorBtn) {
-                cancelEditorBtn.addEventListener('click', () => {
-                    // 1. Pega o nome da medicação que está sendo editada a partir do título do editor
-                    const titleLabel = document.getElementById('medication-time-editor-label');
-                    const medNameToCancel = titleLabel.textContent.replace('Selecione o horário para ', '');
-
-                    // 2. Encontra o objeto da medicação no array de estado
-                    const medObject = currentMedications.find(m => m.name === medNameToCancel);
-
-                    // 3. Se o objeto existir E não tiver nenhum horário salvo, significa que é uma medicação nova
-                    if (medObject && medObject.times.length === 0) {
-                        // 3a. Remove a medicação do array de estado
-                        currentMedications = currentMedications.filter(m => m.name !== medNameToCancel);
-                        
-                        // 3b. Remove o card da medicação da tela
-                        const medBlockToRemove = document.querySelector(`.medication-block[data-med-name="${medNameToCancel}"]`);
-                        if (medBlockToRemove) {
-                            medBlockToRemove.remove();
-                        }
-                        // (Não precisa marcar `setUnsavedChanges`, pois estamos revertendo uma adição)
-                    }
-
-                    // 4. Executa a lógica original de fechar o editor
-                    showMedicationEditor(false);
-                    exitEditMode(moduleMedicacoes);
                 });
             }
 
@@ -8333,6 +8860,44 @@
          if (printUnitSummaryButton) {
             printUnitSummaryButton.addEventListener('click', handlePrintUnitSummary);
         }
+
+        // Abre/Fecha o modal de painel de medicações da unidade
+        if (showUnitMedicationsButton) {
+            showUnitMedicationsButton.addEventListener('click', showUnitMedicationsPanel);
+        }
+        if (closeUnitMedicationsModalButton && unitMedicationsModal) {
+            closeUnitMedicationsModalButton.addEventListener('click', () => {
+                unitMedicationsModal.classList.add('hidden');
+            });
+        }
+
+        // Botões do modal de confirmação de exclusão de prescrição
+        document.getElementById('med-editor-delete-btn').addEventListener('click', (e) => {
+            const prescriptionId = e.currentTarget.dataset.prescriptionId;
+            if (prescriptionId) {
+                confirmDeletePrescriptionButton.dataset.prescriptionId = prescriptionId;
+                deletePrescriptionConfirmModal.classList.remove('hidden');
+            }
+        });
+
+        cancelDeletePrescriptionButton.addEventListener('click', () => {
+            deletePrescriptionConfirmModal.classList.add('hidden');
+        });
+
+        confirmDeletePrescriptionButton.addEventListener('click', () => {
+            const prescriptionId = confirmDeletePrescriptionButton.dataset.prescriptionId;
+            if (prescriptionId) {
+                // Remove todas as doses (atrasadas e futuras) da prescrição
+                const prescriptionName = activePrescriptions.find(d => d.prescriptionId === prescriptionId)?.name || 'A medicação';
+                activePrescriptions = activePrescriptions.filter(d => d.prescriptionId !== prescriptionId);
+
+                renderMedicationLists();
+                resetAndCloseMedicationEditor();
+                setUnsavedChanges(true);
+                showToast(`${prescriptionName} foi suspensa.`, 'success');
+            }
+            deletePrescriptionConfirmModal.classList.add('hidden');
+        });
 
         // Listener unificado para a tecla "Enter" no body
         document.body.addEventListener('keydown', (e) => {
@@ -8465,27 +9030,6 @@
                 });
             }
         }
-
-        // Listener para a tecla "Enter" no campo de medicação
-        medicationInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault(); // Previne o comportamento padrão do Enter
-
-                const inputValue = medicationInput.value.trim();
-
-                // Verifica se há algo escrito no campo
-                if (inputValue) {
-                    // 1. Chama a função principal que cria o card e abre o seletor de tempo.
-                    //    (Exatamente a mesma ação do botão "Confirmar")
-                    handleMedicationSelection(inputValue);
-                    
-                    // 2. Reseta a UI da busca para o estado inicial.
-                    document.getElementById('confirm-med-name-btn').classList.add('hidden');
-                    medicationInput.value = ''; // Limpa o campo de texto
-                    hideActiveAutocomplete();   // Garante que a lista de sugestões feche
-                }
-            }
-        });
 
         // Listener para a tecla "Enter" no campo de diagnóstico
         diagnosisInput.addEventListener('keydown', (e) => {
@@ -8635,251 +9179,6 @@
                 });
             });
         }
-
-        // LÓGICA DO POPUP DE CONFIRMAÇÃO
-
-        const aiPopup = document.getElementById('ai-confirmation-popup');
-        const cancelPopupButton = document.getElementById('cancel-ai-popup');
-        const confirmPopupButton = document.getElementById('confirm-ai-popup');
-
-        function openConfirmationPopup(data) {
-            const form = document.getElementById('ai-confirmation-form');
-            const noDataMessage = document.getElementById('ai-popup-no-data');
-            const confirmButton = document.getElementById('confirm-ai-popup');
-
-            // A função auxiliar agora é definida no início, antes de qualquer chamada.
-            const createRecommendationCard = (rec) => `
-                <div class="recommendation-card">
-                    <p class="recommendation-header">${rec.categoria}</p>
-                    <p class="recommendation-body">
-                        Altere para: <strong>"${rec.recomendacao}"</strong>
-                    </p>
-                </div>
-            `;
-            
-            // Função auxiliar para verificar, preencher e exibir um campo
-            const setupField = (fieldName, dataValue) => {
-                const container = document.getElementById(`popup-${fieldName}-container`);
-                const input = document.getElementById(`popup-${fieldName}`);
-
-                // Apenas o input é estritamente necessário para guardar o valor
-                if (!input) {
-                    return false;
-                }
-
-                // Verifica se o valor recebido é útil (não nulo ou vazio)
-                if (dataValue && String(dataValue).trim() !== '') {
-                    input.value = String(dataValue).trim();
-
-                    // Se existe um container para este campo, garante que ele esteja visível
-                    if (container) {
-                        container.classList.remove('hidden');
-                    }
-                    return true; // Sinaliza que encontrou e preencheu conteúdo
-                }
-
-                // Se não há valor, garante que o container (se existir) fique escondido
-                if (container) {
-                    container.classList.add('hidden');
-                }
-                return false; // Sinaliza que não há conteúdo
-            };
-
-            // Verifica se os dados são nulos ou se o objeto está vazio (sem chaves próprias)
-            if (!data || Object.keys(data).length === 0) {
-                form.classList.add('hidden'); // Esconde o formulário
-                noDataMessage.classList.remove('hidden'); // Mostra a mensagem de erro
-                confirmButton.disabled = true; // Desabilita o botão de confirmar
-            } else {
-                form.classList.remove('hidden'); // Mostra o formulário
-                noDataMessage.classList.add('hidden'); // Esconde a mensagem de erro
-                confirmButton.disabled = false; // Habilita o botão de confirmar
-            }
-
-            form.reset();
-            document.querySelectorAll('.popup-module-card').forEach(card => card.classList.add('hidden'));
-
-            // Módulo: Diagnóstico e Observações
-            const diagnosticoModule = document.getElementById('popup-module-diagnostico');
-            if (diagnosticoModule) {
-                let hasContent = false; // Começa presumindo que não há conteúdo
-
-                // Verifica cada campo. O '||' garante que se 'hasContent' se tornar true uma vez, ele permanecerá true.
-                hasContent = setupField('diagnostico', data.diagnostico) || hasContent;
-                hasContent = setupField('comorbidades', data.comorbidades) || hasContent;
-                hasContent = setupField('alergias', data.alergias) || hasContent;
-                hasContent = setupField('observacoes', data.observacoes) || hasContent;
-
-                // Se qualquer um dos campos acima tiver conteúdo, a flag 'hasContent' será true.
-                if (hasContent) {
-                    diagnosticoModule.classList.remove('hidden'); // Mostra o módulo
-                } else {
-                    diagnosticoModule.classList.add('hidden'); // Garante que ele fique oculto se estiver vazio
-                }
-            }
-
-            // Módulo: Sinais Vitais e Monitoramento
-            if (data.sinaisVitais || data.usoO2 || data.outrosMonitoramento) {
-                const module = document.getElementById('popup-module-sv');
-                module.classList.remove('hidden');
-                if (data.sinaisVitais) {
-                    // CORREÇÃO: Aceita tanto 'pa' quanto 'pressaoArterial' como chave para Pressão Arterial.
-                    if (data.sinaisVitais.pa || data.sinaisVitais.pressaoArterial) {
-                        module.querySelector('#popup-pa').value = data.sinaisVitais.pa || data.sinaisVitais.pressaoArterial;
-                    }
-                    if (data.sinaisVitais.fc) module.querySelector('#popup-fc').value = data.sinaisVitais.fc;
-                    if (data.sinaisVitais.fr) module.querySelector('#popup-fr').value = data.sinaisVitais.fr;
-                    if (data.sinaisVitais.temp) module.querySelector('#popup-temp').value = data.sinaisVitais.temp;
-                    if (data.sinaisVitais.sat) module.querySelector('#popup-sat').value = data.sinaisVitais.sat;
-                    if (data.sinaisVitais.glicemia) module.querySelector('#popup-glicemia').value = data.sinaisVitais.glicemia;
-                }
-                if (data.outrosMonitoramento) module.querySelector('#popup-outros-monitoramento').value = data.outrosMonitoramento;
-                if (data.usoO2) module.querySelector('#popup-uso-o2').checked = true;
-            }
-
-            // Módulo: Dispositivos
-            if (data.dispositivos && data.dispositivos.length > 0) {
-                const module = document.getElementById('popup-module-dispositivos');
-                const container = document.getElementById('popup-devices-list');
-                module.classList.remove('hidden');
-                container.innerHTML = '';
-
-                data.dispositivos.forEach((device, index) => {
-                    const inputId = `popup-device-input-${index}`;
-                    let suggestionHtml = '';
-                    if (device.suggestion) {
-                        suggestionHtml = `
-                            <button type="button" class="device-suggestion-button" data-target-input="${inputId}" data-suggestion="${device.suggestion}">
-                                Usar "${device.suggestion}"?
-                            </button>
-                        `;
-                    }
-                    const itemHtml = `
-                        <div class="device-suggestion-wrapper">
-                            <input type="text" id="${inputId}" value="${device.transcribed || ''}" class="w-full text-sm">
-                            ${suggestionHtml}
-                        </div>
-                    `;
-                    container.innerHTML += itemHtml;
-                });
-            }
-            
-            // Módulo: Medicações
-            if (data.medicamentos && data.medicamentos.length > 0) {
-                const module = document.getElementById('popup-module-medicacoes');
-                module.classList.remove('hidden');
-                const medListContainer = module.querySelector('#popup-medicamentos-list');
-                medListContainer.innerHTML = '';
-                data.medicamentos.forEach((med, index) => {
-                    const inputId = `popup-med-name-${index}`;
-                    const itemHtml = `
-                        <div class="grid grid-cols-12 gap-2 items-center">
-                            <div class="col-span-7 relative">
-                                <input type="text" data-type="med-name" id="${inputId}" value="${med.nome || ''}" class="w-full text-sm">
-                                <button type="button" class="popup-search-icon" data-target-input="${inputId}" data-search-type="medication" title="Buscar sugestões">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 search-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
-                                    <svg class="h-5 w-5 animate-spin spinner-icon hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                </button>
-                            </div>
-                            <div class="col-span-5">
-                                <input type="text" data-type="med-time" value="${med.horario || ''}" class="w-full text-sm" placeholder="Horário">
-                            </div>
-                        </div>
-                    `;
-                    medListContainer.innerHTML += itemHtml;
-                });
-            }
-            
-            // Módulo: Exames
-            if (data.exames && data.exames.length > 0) {
-                const module = document.getElementById('popup-module-exames');
-                module.classList.remove('hidden');
-                const examsContainer = module.querySelector('#popup-exames-list');
-                examsContainer.innerHTML = '';
-                const now = new Date();
-                data.exames.forEach(exam => {
-                    const localDateTime = exam.dataHora ? exam.dataHora.replace(' ', 'T') : '';
-                    const examDate = exam.dataHora ? new Date(exam.dataHora.replace(' ', 'T')) : now;
-
-                    const resultInputHtml = examDate <= now 
-                        ? `<input type="text" data-type="exam-result" value="${exam.resultado || ''}" class="w-full text-sm" placeholder="Resultado (se houver)">`
-                        : `<input type="text" data-type="exam-result" value="" class="w-full text-sm bg-gray-100" placeholder="Agendado" disabled>`;
-
-                    const itemHtml = `<div class="p-2 border rounded-md bg-gray-50 space-y-2"><input type="text" data-type="exam-name" value="${exam.descricao || ''}" class="w-full text-sm font-semibold" placeholder="Nome do exame"><div class="grid grid-cols-2 gap-2"><input type="datetime-local" data-type="exam-datetime" value="${localDateTime}" class="w-full text-sm">${resultInputHtml}</div></div>`;
-                    examsContainer.innerHTML += itemHtml;
-                });
-            }
-
-            // Módulo: Recomendações de Riscos
-            if (data.sugestoesRiscos && data.sugestoesRiscos.length > 0) {
-                const module = document.getElementById('popup-module-riscos');
-                const container = document.getElementById('popup-risks-recommendations');
-                module.classList.remove('hidden');
-                container.innerHTML = data.sugestoesRiscos.map(createRecommendationCard).join('');
-            }
-
-            // Módulo: Recomendações de Cuidados
-            if (data.sugestoesCuidados && data.sugestoesCuidados.length > 0) {
-                const module = document.getElementById('popup-module-cuidados-sugestoes');
-                const container = document.getElementById('popup-care-recommendations');
-                module.classList.remove('hidden');
-                container.innerHTML = data.sugestoesCuidados.map(createRecommendationCard).join('');
-            }
-            
-            aiPopup.classList.remove('hidden');
-            aiPopup.classList.add('flex');
-        }
-
-        /**
-        * Fecha o popup de confirmação.
-        */
-        function closeConfirmationPopup() {
-            aiPopup.classList.add('hidden');
-            aiPopup.classList.remove('flex');
-        }
-
-        // Adiciona eventos de clique aos botões do popup
-        cancelPopupButton.addEventListener('click', closeConfirmationPopup);
-        // Adiciona o evento de clique ao botão de confirmação
-        confirmPopupButton.addEventListener('click', () => {
-            // 1. Coleta os dados editados pelo usuário no popup
-            const devicesString = Array.from(document.querySelectorAll('#popup-devices-list input[type="text"]'))
-                .map(input => input.value.trim())
-                .filter(value => value) // Remove valores vazios
-                .join(', ');
-            const dataFromPopup = {
-                diagnostico: document.getElementById('popup-diagnostico').value,
-                comorbidades: document.getElementById('popup-comorbidades').value,
-                alergias: document.getElementById('popup-alergias').value,
-                observacoes: document.getElementById('popup-observacoes').value,
-                sinaisVitais: {
-                    pa: document.getElementById('popup-pa').value,
-                    fc: document.getElementById('popup-fc').value,
-                    fr: document.getElementById('popup-fr').value,
-                    temp: document.getElementById('popup-temp').value,
-                    sat: document.getElementById('popup-sat').value,
-                    glicemia: document.getElementById('popup-glicemia').value
-                },
-                usoO2: document.getElementById('popup-uso-o2').checked,
-                outrosMonitoramento: document.getElementById('popup-outros-monitoramento').value,
-                dispositivos: devicesString,
-                medicamentos: Array.from(document.querySelectorAll('#popup-medicamentos-list > div')).map(div => ({
-                    nome: div.querySelector('[data-type="med-name"]').value,
-                    horario: div.querySelector('[data-type="med-time"]').value
-                })),
-                exames: Array.from(document.querySelectorAll('#popup-exames-list > div')).map(div => ({
-                    nome: div.querySelector('[data-type="exam-name"]').value,
-                    dataHora: (div.querySelector('[data-type="exam-datetime"]').value || '').replace('T', ' '),
-                    resultado: div.querySelector('[data-type="exam-result"]').value
-                })),
-            };
-
-            // 2. Chama a função para preencher o formulário principal COM os dados
-            autofillMainForm(dataFromPopup);
-            
-            // 3. Fecha o popup
-            closeConfirmationPopup();
-        });
         
         // --- FUNÇÕES DE FORMATAÇÃO DE TEXTO ---
 
@@ -9058,26 +9357,34 @@
                 enterEditMode(document.getElementById('module-medicacoes'));
                 const now = new Date();
                 data.medicamentos.forEach(med => {
-                    if (med.nome) {
-                        const medObject = { name: med.nome, times: [] };
-                        if (med.horario) {
-                            const [hours, minutes] = med.horario.split(':').map(Number);
-                            if (!isNaN(hours) && !isNaN(minutes)) {
-                                let medTime = new Date();
-                                medTime.setHours(hours, minutes, 0, 0);
+                    if (med.nome && med.horario) {
+                        const [hours, minutes] = med.horario.split(':').map(Number);
+                        if (isNaN(hours) || isNaN(minutes)) return;
 
-                                // Se o horário informado for no futuro de hoje, assume que foi ontem
-                                if (medTime.getTime() > now.getTime()) {
-                                    medTime.setDate(medTime.getDate() - 1);
-                                }
-                                medObject.times.push(medTime.getTime());
-                            }
+                        let medTime = new Date();
+                        medTime.setHours(hours, minutes, 0, 0);
+
+                        // Se o horário já passou hoje, considera como administrado. Se não, como agendado.
+                        if (medTime <= now) {
+                            administeredInShift.push({
+                                id: `med_${medTime.getTime()}`,
+                                name: med.nome,
+                                dose: 'Ajustar', // Usuário precisará ajustar a dose
+                                time: medTime,
+                                prescriptionId: `single_voice_${medTime.getTime()}`
+                            });
+                        } else {
+                            activePrescriptions.push({
+                                id: `med_${medTime.getTime()}`,
+                                name: med.nome,
+                                dose: 'Ajustar',
+                                time: medTime,
+                                prescriptionId: `single_voice_${medTime.getTime()}`
+                            });
                         }
-                        currentMedications.push(medObject);
-                        createMedicationCard(medObject);
                     }
                 });
-                updateMedicationSummary('autofill');
+                renderMedicationLists();
             }
             
             // Exames
@@ -9341,4 +9648,3 @@
                 }
             }
         });
-
