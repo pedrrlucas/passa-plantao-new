@@ -173,6 +173,12 @@
                                   <path fill-rule="evenodd" d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Zm4.5 7.5a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0v-2.25a.75.75 0 0 1 .75-.75Zm3.75-1.5a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 1.5 0V12Zm2.25-3a.75.75 0 0 1 .75.75v6.75a.75.75 0 0 1-1.5 0V9.75A.75.75 0 0 1 13.5 9Zm3.75-1.5a.75.75 0 0 0-1.5 0v9a.75.75 0 0 0 1.5 0v-9Z" clip-rule="evenodd" />
                                 </svg>
                             </button>
+                            <button id="show-unit-medications-button" title="Ver Painel de Medicações da Unidade" class="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-indigo-600 transition-colors relative">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
+                                  <path d="M12 2.25a.75.75 0 0 1 .75.75v.518a13.535 13.535 0 0 1 6.236 3.016l.44-.254a.75.75 0 0 1 .866 1.3l-.44.254a13.535 13.535 0 0 1 3.016 6.236l.518.043a.75.75 0 0 1 .698.866l-.518.043a13.535 13.535 0 0 1-3.016 6.236l.44.254a.75.75 0 0 1-.866 1.3l-.44-.254a13.535 13.535 0 0 1-6.236 3.016l-.043.518a.75.75 0 0 1-.866.698l-.043-.518a13.535 13.535 0 0 1-6.236-3.016l-.44.254a.75.75 0 0 1-.866-1.3l.44-.254a13.535 13.535 0 0 1-3.016-6.236l-.518-.043a.75.75 0 0 1-.698-.866l.518-.043A13.535 13.535 0 0 1 3.482 6.06l-.44-.254a.75.75 0 0 1 .866-1.3l.44.254A13.535 13.535 0 0 1 11.25 3.518v-.518A.75.75 0 0 1 12 2.25ZM12.25 10.875a.75.75 0 0 0-1.5 0v3.375h-3.375a.75.75 0 0 0 0 1.5h3.375v3.375a.75.75 0 0 0 1.5 0v-3.375h3.375a.75.75 0 0 0 0-1.5h-3.375v-3.375Z" />
+                              </svg>
+                              <span id="medication-alert-indicator" class="hidden absolute top-1 right-1 block h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white"></span>
+                          </button>
                         </div>
                         
                         <div class="flex items-center justify-between md:justify-end gap-x-2 order-first md:order-last">
@@ -856,57 +862,111 @@
                             </div>
 
                             <div id="module-medicacoes" class="bg-white rounded-lg shadow p-4 module-card">
-                                    <div class="flex justify-between items-center mb-2 border-b pb-2">
-                                        <h3 class="text-base font-semibold text-gray-800 flex items-center">
-                                            Medicações do Plantão
-                                        </h3>
-                                        <div class="flex items-center space-x-2">
-                                            <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="medicacoes">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
-                                                <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
-                                                </svg>
-                                            </button>
+                                <div class="flex justify-between items-center mb-2 border-b pb-2">
+                                    <h3 class="text-base font-semibold text-gray-800 flex items-center">
+                                        Medicações
+                                    </h3>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" title="Ver Histórico do Módulo" class="module-history-btn text-blue-600 hover:text-blue-800 transition-colors" data-module="medicacoes">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 2.25a.75.75 0 01.75.75v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3h.75V3a.75.75 0 01.75-.75zM5.25 6.75c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h13.5c.621 0 1.125-.504 1.125-1.125V7.875c0-.621-.504-1.125-1.125-1.125H5.25z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="medication-grid-container flex-grow grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="medication-column">
+                                        <h4 class="medication-column-header">Prescrições Ativas</h4>
+                                        <div id="active-prescriptions-list" class="medication-list"></div>
+                                    </div>
+                                    <div class="medication-column">
+                                        <h4 class="medication-column-header">Administrados no Plantão</h4>
+                                        <div id="administered-during-shift-list" class="medication-list"></div>
+                                    </div>
+                                </div>
+
+                                <div id="medication-editor-area" class="hidden absolute bottom-0 left-0 right-0 bg-white border-t p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] z-20">
+                                    <input type="hidden" id="med-editor-id">
+                                    <input type="hidden" id="med-editor-mode">
+
+                                    <div class="flex justify-between items-center mb-3">
+                                        <h4 id="med-editor-title" class="text-sm font-semibold text-gray-800">Nova Medicação</h4>
+                                        <button type="button" id="med-editor-close-btn" class="p-1 rounded-full hover:bg-gray-200">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+
+                                    <div class="space-y-3">
+                                        <div id="med-step-1-basic-info" class="med-editor-step">
+                                            <div class="grid grid-cols-3 gap-x-2">
+                                                <div class="col-span-2">
+                                                    <label for="med-editor-name" class="block text-xs font-medium text-gray-700">Nome do Medicamento</label>
+                                                    <input type="text" id="med-editor-name" autocomplete="off" class="mt-1 w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                                </div>
+                                                <div>
+                                                    <label for="med-editor-dose" class="block text-xs font-medium text-gray-700">Dose</label>
+                                                    <input type="text" id="med-editor-dose" autocomplete="off" placeholder="ex: 500 mg" class="mt-1 w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div id="med-step-2-type-selection" class="med-editor-step hidden">
+                                            <label class="block text-xs font-medium text-gray-700">Tipo de Prescrição</label>
+                                            <div class="mt-1 flex space-x-2">
+                                                <button type="button" data-type="single" class="med-type-btn flex-1 rounded-md bg-blue-100 text-blue-700 px-3 py-2 text-xs font-semibold hover:bg-blue-200">Dose Única</button>
+                                                <button type="button" data-type="continuous" class="med-type-btn flex-1 rounded-md bg-green-100 text-green-700 px-3 py-2 text-xs font-semibold hover:bg-green-200">Uso Contínuo (Posologia)</button>
+                                            </div>
+                                        </div>
+
+                                        <div id="med-step-3a-single-dose-action" class="med-editor-step hidden">
+                                            <label class="block text-xs font-medium text-gray-700">Ação para Dose Única</label>
+                                            <div class="mt-1 flex space-x-2">
+                                                <button type="button" data-action="schedule" class="med-single-action-btn flex-1 rounded-md border border-gray-300 px-3 py-2 text-xs font-semibold hover:bg-gray-100">Agendar</button>
+                                                <button type="button" data-action="register" class="med-single-action-btn flex-1 rounded-md border border-gray-300 px-3 py-2 text-xs font-semibold hover:bg-gray-100">Registrar Agora</button>
+                                            </div>
+                                        </div>
+
+                                        <div id="med-step-3b-continuous-dose-details" class="med-editor-step hidden space-y-2">
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700">Horário da Dose Inicial</label>
+                                                <input type="text" id="med-editor-start-time" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-x-2">
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-700">Frequência (horas)</label>
+                                                    <input type="number" id="med-editor-frequency" placeholder="ex: 6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-700">Duração (dias)</label>
+                                                    <input type="number" id="med-editor-duration" placeholder="ex: 7" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div id="med-step-4-datetime-picker" class="med-editor-step hidden">
+                                            <label id="med-editor-datetime-label" for="med-editor-datetime-input" class="block text-xs font-medium text-gray-700">Data e Hora</label>
+                                            <input type="text" id="med-editor-datetime-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
+                                        </div>
+
+                                        <div id="med-editor-final-actions" class="hidden flex justify-between items-center pt-2 border-t mt-2">
+                                            <button type="button" id="med-editor-delete-btn" class="hidden rounded-md bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 shadow-sm hover:bg-red-200">Suspender Prescrição</button>
+                                            <div class="flex justify-end space-x-2 flex-grow">
+                                                <button type="button" id="med-editor-back-btn" class="rounded-md bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Voltar</button>
+                                                <button type="button" id="med-editor-save-btn" class="rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-blue-500">Salvar</button>
+                                            </div>
                                         </div>
                                     </div>
-                                <input type="text" id="medication-time-picker-input" class="hidden">
-                                
-                                <div id="medications-list-container" class="space-y-2 min-h-[24px]"></div>
+                                </div>
 
-                                <div class="mt-auto pt-3 border-t border-gray-200">
-            
-                                    <div id="medication-action-area" class="flex justify-center">
+                                <div id="medication-main-action-area" class="border-t pt-2 mt-auto">
+                                    <div class="flex justify-center">
                                         <button type="button" id="add-new-medication-btn" class="rounded-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-4 py-1 flex items-center space-x-2 text-xs">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
                                             <span>Nova Medicação</span>
                                         </button>
                                     </div>
-
-                                    <div id="medication-editor-area" class="hidden">
-                                        <div id="medication-search-editor">
-                                            <label for="form-medications" class="block text-xs font-medium text-gray-700 mb-1">Buscar ou Digitar Nova Medicação</label>
-                                            <div class="relative mt-1 flex items-center gap-x-2">
-                                                <div class="relative flex-grow">
-                                                    <input type="text" id="form-medications" autocomplete="off" placeholder="Buscar ou digitar nome..." class="w-full rounded-md border-gray-300 shadow-sm py-1 px-2 text-sm">
-                                                    <div id="medication-autocomplete-container" class="relative">
-                                                        <div id="medication-autocomplete-list" class="absolute w-full bg-white border rounded-md shadow-lg z-10 hidden"></div>
-                                                    </div>
-                                                </div>
-                                                <button type="button" id="confirm-med-name-btn" class="hidden flex-shrink-0 rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-blue-500">Confirmar</button>
-                                            </div>
-                                        </div>
-
-                                        <div id="medication-time-editor" class="hidden">
-                                            <label id="medication-time-editor-label" class="block text-xs font-medium text-gray-700">Selecione o horário</label>
-                                            <div id="inline-time-picker-container" class="flex justify-center"></div>
-                                            <div class="flex items-center space-x-2 mt-2">
-                                                <button type="button" id="correct-med-time-btn" class="hidden flex-1 rounded-md bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Corrigir Antigo</button>
-                                                <button type="button" id="add-med-time-btn" class="flex-1 rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-blue-500">Adicionar Novo</button>
-                                            </div>
-                                        </div>
-
-                                        <button type="button" id="cancel-editor-btn" class="w-full text-center text-xs text-red-600 hover:underline mt-2">Cancelar</button>
-                                    </div>
-                                </div> 
+                                </div>
                             </div>
 
                             <div id="module-observacoes" class="bg-white rounded-lg shadow p-4 module-card">
@@ -1247,6 +1307,58 @@
             </div>
         </div>
 
+        <div id="administer-med-confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+              <div class="mt-3 text-center">
+                  <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                      <svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                      </svg>
+                  </div>
+                  <h3 id="administer-med-confirm-title" class="text-lg leading-6 font-medium text-gray-900 mt-4">Confirmar Administração</h3>
+                  <div class="mt-2 px-7 py-3">
+                      <p id="administer-med-confirm-text" class="text-sm text-gray-500">
+                          Você confirma a administração de <strong>[Medicamento]</strong> agora?
+                      </p>
+                  </div>
+                  <div class="items-center px-4 py-3 space-x-4">
+                      <button id="confirm-administer-med-button" class="px-4 py-2 bg-green-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                          Sim, Administrar
+                      </button>
+                      <button id="cancel-administer-med-button" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                          Cancelar
+                      </button>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+        <div id="delete-prescription-confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                        <svg class="h-6 w-6 text-red-600" xmlns="http://www.w.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4">Suspender Prescrição?</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500">
+                            Tem certeza de que deseja suspender esta prescrição? Todas as doses futuras agendadas serão removidas.
+                        </p>
+                    </div>
+                    <div class="items-center px-4 py-3 space-x-4">
+                        <button id="confirm-delete-prescription-button" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-red-700">
+                            Sim, Suspender
+                        </button>
+                        <button id="cancel-delete-prescription-button" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="cancel-exam-confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
             <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
                 <div class="mt-3 text-center">
@@ -1462,6 +1574,19 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="unit-medications-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <p id="unit-medications-title" class="text-2xl font-bold text-gray-800">Próximas Medicações da Unidade</p>
+                <button id="close-unit-medications-modal-button" class="cursor-pointer z-50 p-2 rounded-full hover:bg-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-gray-600"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div id="unit-medications-content" class="mt-4 max-h-[70vh] overflow-y-auto pr-2 space-y-3">
+                </div>
         </div>
     </div>
 
