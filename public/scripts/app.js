@@ -108,7 +108,6 @@
         let unsubscribePatients = null;
         let unsubscribeHandovers = null;
         let currentHistoryPage = 1;
-        // ADICIONADAS:
         const PATIENTS_PER_PAGE = 9; // Carrega 9 por vez (bom para grids de 3 colunas)
         let lastVisiblePatientDoc = null; // Guarda o último documento para a paginação
         let isLoadingPatients = false;    // Impede carregamentos múltiplos
@@ -144,6 +143,7 @@
         let unitTrendsChart = null;
         let unitFlowChart = null;
         let currentUnitSummaryData = null;
+        let dosesToRender = [];
 
         // Modal de Medicações
         const showUnitMedicationsButton = document.getElementById('show-unit-medications-button');
@@ -151,9 +151,6 @@
         const closeUnitMedicationsModalButton = document.getElementById('close-unit-medications-modal-button');
         const unitMedicationsContent = document.getElementById('unit-medications-content');
         const medicationAlertIndicator = document.getElementById('medication-alert-indicator');
-        const administerMedConfirmModal = document.getElementById('administer-med-confirm-modal');
-        const confirmAdministerMedButton = document.getElementById('confirm-administer-med-button');
-        const cancelAdministerMedButton = document.getElementById('cancel-administer-med-button');
         const deletePrescriptionConfirmModal = document.getElementById('delete-prescription-confirm-modal');
         const confirmDeletePrescriptionButton = document.getElementById('confirm-delete-prescription-button');
         const cancelDeletePrescriptionButton = document.getElementById('cancel-delete-prescription-button');
@@ -526,7 +523,6 @@
          * @returns {object} - Um objeto contendo todos os KPIs calculados.
          */
         function processKPIs(handovers) {
-            // A estrutura do objeto kpis foi alterada para armazenar valor E metadados
             const kpis = {
                 maxFC: { value: -Infinity, timestamp: null },
                 minPAS: { value: Infinity, timestamp: null },
@@ -542,17 +538,14 @@
                 sosMedCount: { count: 0, timestamps: [] }
             };
 
-            // Variáveis internas para cálculo de média
             let sumFC = 0, countFC = 0, sumPAS = 0, countPAS = 0;
             const sosMeds = ['acetilsalicilico', 'bromoprida', 'codeina', 'diazepam', 'dipirona', 'haloperidol', 'ibuprofeno', 'metoclopramida', 'midazolam', 'morfina', 'ondansetrona', 'paracetamol', 'tramadol', 'epinefrina', 'norepinefrina', 'dobutamina'];
 
             handovers.forEach(h => {
                 const timestamp = h.timestamp?.toDate ? h.timestamp.toDate() : new Date();
 
-                // 1. Processa dados de Monitoramento
                 if (h.monitoring) {
                     const mon = h.monitoring;
-
                     const fc = parseInt(mon.fc, 10);
                     if (!isNaN(fc)) {
                         if (fc > kpis.maxFC.value) {
@@ -562,13 +555,11 @@
                         sumFC += fc;
                         countFC++;
                     }
-
                     const fr = parseInt(mon.fr, 10);
                     if (!isNaN(fr) && fr > kpis.maxFR.value) {
                         kpis.maxFR.value = fr;
                         kpis.maxFR.timestamp = timestamp;
                     }
-
                     const pa = parseInt((mon.pa || '').split('/')[0], 10);
                     if (!isNaN(pa)) {
                         if (pa < kpis.minPAS.value) {
@@ -578,7 +569,6 @@
                         sumPAS += pa;
                         countPAS++;
                     }
-
                     const temp = parseFloat((mon.temp || '').replace(',', '.'));
                     if (!isNaN(temp)) {
                         if (temp > kpis.maxTemp.value) {
@@ -589,20 +579,17 @@
                             kpis.feverEpisodes.timestamps.push(timestamp);
                         }
                     }
-                    
                     const satO2 = parseInt(mon.sato2, 10);
                     if (!isNaN(satO2) && satO2 < kpis.minSatO2.value) {
                         kpis.minSatO2.value = satO2;
                         kpis.minSatO2.timestamp = timestamp;
                     }
-
                     const hgt = parseInt(mon.hgt, 10);
                     if (!isNaN(hgt) && hgt < 70) {
                         kpis.hypoglycemiaEpisodes.timestamps.push(timestamp);
                     }
                 }
 
-                // 2. Processa Scores
                 if (h.news2?.score !== undefined && h.news2.score > kpis.maxNEWS2.value) {
                     kpis.maxNEWS2.value = h.news2.score;
                     kpis.maxNEWS2.timestamp = timestamp;
@@ -612,30 +599,26 @@
                     kpis.maxFugulin.timestamp = timestamp;
                 }
 
-                // 3. Processa Medicações SOS
-                if (h.medications && Array.isArray(h.medications)) {
-                    h.medications.forEach(med => {
-                        const medNameLower = med.name.toLowerCase();
+                if (h.medicationsAdministered && Array.isArray(h.medicationsAdministered)) {
+                    h.medicationsAdministered.forEach(med => {
+                        const medNameLower = (med.name || '').toLowerCase();
                         if (sosMeds.some(sosMed => medNameLower.includes(sosMed))) {
-                            // CORREÇÃO: Garante que estamos adicionando ao contador para cada dose (horário) registrada.
-                            if (med.times && med.times.length > 0) {
-                                kpis.sosMedCount.timestamps.push(...med.times.map(t => new Date(t)));
-                            }
+                            // Converte o timestamp do Firestore para um objeto Date
+                            const medTime = med.time?.toDate ? med.time.toDate() : (med.time ? new Date(med.time) : timestamp);
+                            kpis.sosMedCount.timestamps.push(medTime);
                         }
                     });
                 }
             });
 
-            // Calcula médias e contagens finais
             kpis.avgFC.value = countFC > 0 ? Math.round(sumFC / countFC) : null;
             kpis.avgFC.count = countFC;
             kpis.avgPAS.value = countPAS > 0 ? Math.round(sumPAS / countPAS) : null;
             kpis.avgPAS.count = countPAS;
             kpis.hypoglycemiaEpisodes.count = kpis.hypoglycemiaEpisodes.timestamps.length;
             kpis.feverEpisodes.count = kpis.feverEpisodes.timestamps.length;
-            kpis.sosMedCount.count = kpis.sosMedCount.timestamps.length;
+            kpis.sosMedCount.count = kpis.sosMedCount.timestamps.length; // A contagem é feita aqui
 
-            // Limpa valores iniciais
             if (kpis.maxFC.value === -Infinity) kpis.maxFC.value = null;
             if (kpis.minPAS.value === Infinity) kpis.minPAS.value = null;
             if (kpis.maxTemp.value === -Infinity) kpis.maxTemp.value = null;
@@ -783,9 +766,9 @@
                 };
 
                 const medicationCounts = allHandoversLast7Days.reduce((acc, h) => {
-                    if (h.medications) {
-                        h.medications.forEach(med => {
-                            acc[med.name] = (acc[med.name] || 0) + med.times.length;
+                    if (h.medicationsAdministered) {
+                        h.medicationsAdministered.forEach(med => {
+                            acc[med.name] = (acc[med.name] || 0) + 1; // Cada item é uma dose
                         });
                     }
                     return acc;
@@ -1163,7 +1146,7 @@
             if (!tableBody) return;
 
             if (!highRiskPatients || highRiskPatients.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Nenhum paciente com risco elevado (NEWS2 ≥ 5) no momento.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Nenhum paciente com risco elevado (NEWS ≥ 5) no momento.</td></tr>`;
                 return;
             }
 
@@ -1262,7 +1245,6 @@
          */
         async function handlePrintUnitSummary() {
             const printView = document.getElementById('print-view');
-            // Valida se os dados necessários para a impressão estão disponíveis
             if (!currentUnitSummaryData || !fugulinChart || !unitTrendsChart || !medicationChart || !unitFlowChart) {
                 showToast("Dados do resumo da unidade não estão prontos para impressão.", "error");
                 return;
@@ -1270,16 +1252,24 @@
             
             showToast("Preparando impressão...", 2000);
 
-            // 1. Desestrutura os dados já processados e armazenados na variável global
-            const { kpis, highRiskPatients, diagnosisFrequency } = currentUnitSummaryData;
+            const { kpis, highRiskPatients, diagnosisFrequency, medicationChartData } = currentUnitSummaryData;
 
-            // 2. Converte todos os gráficos do canvas para imagens base64, que podem ser impressas
             const fugulinChartImg = fugulinChart.toBase64Image();
             const medicationChartImg = medicationChart.toBase64Image();
             const trendsChartImg = unitTrendsChart.toBase64Image();
             const flowChartImg = unitFlowChart.toBase64Image();
 
-            // 3. Monta o HTML para impressão com estilos inline para garantir a formatação correta
+
+            let topMedicationsHtml = '<tr><td colspan="2" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Nenhuma medicação administrada.</td></tr>';
+            if (medicationChartData && medicationChartData.data.length > 0) {
+                topMedicationsHtml = medicationChartData.labels.map((label, index) => `
+                    <tr style="page-break-inside: avoid;">
+                        <td style="border: 1px solid #ddd; padding: 4px;">${medicationChartData.fullLabels[index]}</td>
+                        <td style="border: 1px solid #ddd; padding: 4px; text-align: center;">${medicationChartData.data[index]}</td>
+                    </tr>
+                `).join('');
+            }
+
             printView.innerHTML = `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                     <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;">
@@ -1315,6 +1305,20 @@
                         </div>
                     </div>
 
+                    <div style="margin-top: 25px; page-break-before: auto;">
+                        <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Medicações Mais Utilizadas (Últimos 7 dias)</h3>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                            <thead style="background-color: #f2f2f2; text-align: left;">
+                                <tr>
+                                    <th style="border: 1px solid #ddd; padding: 5px;">Medicação</th>
+                                    <th style="border: 1px solid #ddd; padding: 5px; text-align: center;">Doses Administradas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${topMedicationsHtml}
+                            </tbody>
+                        </table>
+                    </div>
                     <div style="margin-top: 25px; page-break-before: auto;">
                         <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Pacientes com Maior Risco de Deterioração</h3>
                         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
@@ -1364,7 +1368,6 @@
                 </div>
             `;
 
-            // 4. Aciona a impressão do navegador após um breve momento para renderizar
             setTimeout(() => window.print(), 300);
         }
 
@@ -1430,6 +1433,24 @@
                 // Exibe uma mensagem de erro se a busca falhar
                 loader.innerHTML = '<p class="text-red-600 p-10">Ocorreu um erro ao buscar os dados. Tente novamente.</p>';
             }
+        }
+
+        /**
+         * Formata um valor numérico de dose (em mg) para uma string com unidade (mg ou g).
+         * @param {number | string} doseInMg - A dose em miligramas.
+         * @returns {string} - A dose formatada (ex: "500mg", "1g", "1.5g").
+         */
+        function formatDose(doseInMg) {
+            const dose = parseFloat(doseInMg);
+            if (isNaN(dose)) {
+                return doseInMg; // Retorna o valor original se não for um número (ex: "1 cp")
+            }
+            if (dose >= 1000) {
+                const grams = dose / 1000;
+                // Formata para o padrão brasileiro e remove zeros desnecessários no final
+                return `${grams.toLocaleString('pt-BR', { maximumFractionDigits: 3 }).replace(/\.?0+$/, '')}g`;
+            }
+            return `${dose}mg`;
         }
 
         /**
@@ -1557,32 +1578,23 @@
             const events = [];
             const sosMeds = ['acetilsalicilico', 'bromoprida', 'codeina', 'diazepam', 'dipirona', 'haloperidol', 'ibuprofeno', 'metoclopramida', 'midazolam', 'morfina', 'ondansetrona', 'paracetamol', 'tramadol', 'epinefrina', 'norepinefrina', 'dobutamina'];
 
-            // Alterado para um forEach com índice para podermos comparar com o plantão anterior
             handovers.forEach((h, index) => {
                 const timestamp = h.timestamp?.toDate ? h.timestamp.toDate() : new Date();
                 const professional = h.professionalName || 'N/A';
 
-                // 1. Alertas Clínicos (Scores e Febre)
+                // Alertas Clínicos
                 if (h.news2?.score >= 5) {
-                    // Pega o plantão anterior no tempo (que é o próximo item no nosso array invertido)
                     const previousHandover = handovers[index + 1];
-                    // Pega o score anterior. Se não existir, considera 0.
                     const previousScore = previousHandover?.news2?.score ?? 0;
-
-                    // CRIA O ALERTA APENAS SE:
-                    // - O score atual for maior que o anterior, OU
-                    // - Não houver um plantão anterior para comparar (é o primeiro registro da semana)
                     if (h.news2.score > previousScore || !previousHandover) {
                         events.push({
                             timestamp,
                             category: '⚠️ Alerta Clínico',
-                            // Descrição melhorada para dar mais contexto
                             description: `Aumento do Score NEWS para: <strong>${h.news2.score}</strong> (anterior: ${previousHandover ? previousScore : 'N/A'})`,
                             professional
                         });
                     }
                 }
-                
                 if (h.monitoring?.temp) {
                     const temp = parseFloat(h.monitoring.temp.replace(',', '.'));
                     if (temp > 37.8) {
@@ -1595,22 +1607,68 @@
                     }
                 }
                 
-                // 2. Novas Medicações SOS (lógica inalterada)
-                if (h.medications && h.medications.length > 0) {
-                    h.medications.forEach(med => {
-                        const medNameLower = med.name.toLowerCase();
-                        if (sosMeds.some(sosMed => medNameLower.includes(sosMed))) {
-                            events.push({
-                                timestamp,
-                                category: '💉 Medicação SOS',
-                                description: `Administrado <strong>${med.name}</strong> (${med.times.length}x)`,
-                                professional
-                            });
-                        }
+                // Medicações SOS Administradas
+                if (h.medicationsAdministered && Array.isArray(h.medicationsAdministered)) {
+                    const sosAdministered = h.medicationsAdministered.filter(med => {
+                        const medNameLower = (med.name || '').toLowerCase();
+                        return sosMeds.some(sosMed => medNameLower.includes(sosMed));
                     });
+                    if (sosAdministered.length > 0) {
+                        const description = sosAdministered.map(med => `<strong>${med.name} ${formatDose(med.dose)}</strong>`).join(', ');
+                        events.push({
+                            timestamp,
+                            category: '💉 Medicação SOS',
+                            description: `Administrado: ${description}`,
+                            professional
+                        });
+                    }
                 }
 
-                // 3. Exames e Procedimentos (lógica inalterada)
+                // Novas Prescrições
+                const medChanges = h.changes?.medications;
+                if (medChanges) {
+                    if (medChanges.added?.length > 0) {
+                        medChanges.added.forEach(med => {
+                            events.push({
+                                timestamp,
+                                category: '💊 Prescrição',
+                                description: `Iniciado ${formatPrescriptionForHistory(med)}`,
+                                professional
+                            });
+                        });
+                    }
+                    if (medChanges.modified?.length > 0) {
+                        medChanges.modified.forEach(mod => {
+                            const before = mod.before;
+                            const after = mod.after;
+                            let changeDesc = `Modificado <strong>${after.name} ${formatDose(after.dose)}</strong>.`;
+                            if (before.frequency !== after.frequency) {
+                                changeDesc += ` Frequência alterada de ${before.frequency}h para ${after.frequency}h.`;
+                            }
+                            if (before.duration !== after.duration) {
+                                changeDesc += ` Duração alterada de ${before.duration} dias para ${after.duration} dias.`;
+                            }
+                            events.push({
+                                timestamp,
+                                category: '💊 Prescrição',
+                                description: changeDesc,
+                                professional
+                            });
+                        });
+                    }
+                    if (medChanges.suspended?.length > 0) {
+                        medChanges.suspended.forEach(med => {
+                            events.push({
+                                timestamp,
+                                category: '💊 Prescrição',
+                                description: `Suspendido ${formatPrescriptionForHistory(med)}`,
+                                professional
+                            });
+                        });
+                    }
+                }
+
+                // Exames e Procedimentos
                 if (h.examsDone && h.examsDone.length > 0) {
                     h.examsDone.forEach(exam => {
                         events.push({
@@ -1642,7 +1700,7 @@
                     });
                 }
 
-                // 4. Novos Diagnósticos (lógica inalterada)
+                // Novos Diagnósticos
                 if (h.changes?.diagnoses?.added?.length > 0) {
                     h.changes.diagnoses.added.forEach(diag => {
                         events.push({
@@ -1655,7 +1713,8 @@
                 }
             });
 
-            return events;
+            // Ordena os eventos por data, do mais recente para o mais antigo, para garantir a ordem correta na timeline
+            return events.sort((a, b) => b.timestamp - a.timestamp);
         }
 
 
@@ -2173,11 +2232,14 @@
         }
 
         /**
-         * [VERSÃO DE DEPURAÇÃO]
          * Reseta completamente o estado e a UI do formulário de passagem de plantão.
          * Garante que nenhum dado de um plantão anterior persista e avisa sobre elementos não encontrados.
          */
         function resetFormState() {
+            const formToReset = document.getElementById('add-handovers-form');
+            if (formToReset) {
+                formToReset.reset();
+            }
             const safeClear = (elementId) => {
                 const element = document.getElementById(elementId);
                 if (element) {
@@ -2187,7 +2249,6 @@
                 }
             };
 
-            addHandoversForm.reset();
             activePrescriptions = [];
             administeredInShift = [];
             patientExams = [];
@@ -2221,12 +2282,18 @@
             const allergyRadioNo = document.getElementById('allergy-radio-no');
             if(allergyRadioNo) allergyRadioNo.checked = false;
 
-            document.querySelectorAll('#dispositivos-grid input[type="checkbox"]').forEach(chk => chk.checked = false);
+            const dispositivosGrid = document.getElementById('dispositivos-grid');
+            if (dispositivosGrid) {
+                dispositivosGrid.querySelectorAll('input[type="checkbox"]').forEach(chk => chk.checked = false);
+            }
             
             renderExams();
             resetAndCloseExamEditor();
 
-            document.querySelectorAll('.input-wrapper').forEach(wrapper => wrapper.classList.add('hidden'));
+            const inputWrappers = document.querySelectorAll('.input-wrapper');
+            if (inputWrappers) {
+                inputWrappers.forEach(wrapper => wrapper.classList.add('hidden'));
+            }
 
             const editingModule = document.querySelector('.module-editing');
             if (editingModule) {
@@ -2273,15 +2340,11 @@
             moduleElement.classList.remove('module-editing');
 
             // Lógica específica para o módulo de medicações
-            if (moduleElement.id === 'module-medicacoes') {
-                const medicationInput = document.getElementById('form-medications');
-                const timeEditor = document.getElementById('medication-time-editor');
-
-                // Se o campo de busca estiver vazio e o editor de tempo não estiver aberto,
-                // reseta a UI interna do módulo para o estado inicial.
-                if (medicationInput.value.trim() === '' && timeEditor.classList.contains('hidden')) {
-                }
-            }
+            if (moduleElement.id === 'module-medicacoes') {
+                // Esta é a linha que faltava!
+                // Ela chama a função que esconde o editor de medicação.
+                resetAndCloseMedicationEditor();
+            }
 
             const inputWrappers = moduleElement.querySelectorAll('.input-wrapper');
             inputWrappers.forEach(wrapper => wrapper.classList.add('hidden'));
@@ -2289,7 +2352,6 @@
             const clickableAreas = moduleElement.querySelectorAll('.clickable-item-area');
             clickableAreas.forEach(area => area.classList.remove('hidden'));
             
-            // --- INÍCIO DA MODIFICAÇÃO ---
             // Verifica se o módulo é um dos que têm o botão de Adicionar/Cancelar
             if (moduleElement.id === 'module-precaucoes' || moduleElement.id === 'module-dispositivos') {
                 const triggerWrapper = moduleElement.querySelector('.trigger-wrapper');
@@ -2303,7 +2365,6 @@
                 // Limpa o campo de texto
                 if(inputField) inputField.value = '';
             }
-            // --- FIM DA MODIFICAÇÃO ---
 
             if (activeEditingModule === moduleElement) {
                 activeEditingModule = null;
@@ -2888,10 +2949,6 @@
         
         // --- LÓGICA DE EVENTOS (SETUP) ---
 
-        addHandoversForm.addEventListener('input', () => {
-            setUnsavedChanges(true);
-        });
-
         // Listener para avisar sobre saída com alterações não salvas
         window.addEventListener('beforeunload', (event) => {
             if (hasUnsavedChanges) {
@@ -3016,7 +3073,7 @@
             resultTextareaWrapper: document.getElementById('exam-editor-result-textarea-wrapper'),
             resultTextarea: document.getElementById('exam-editor-result-textarea'),
             actionsWrapper: document.getElementById('exam-editor-actions-wrapper'),
-            cancelBtn: document.getElementById('exam-editor-cancel-btn'),
+            backBtn: document.getElementById('exam-editor-back-btn'),
             saveBtn: document.getElementById('exam-editor-save-btn')
         };
 
@@ -3098,18 +3155,12 @@
             const item = document.createElement('div');
             item.dataset.id = exam.id;
 
-            // --- 1. Definições de data e hora atuais ---
             const now = new Date();
             const examDate = new Date(exam.timestamp || 0);
             const twentyFourHoursInMillis = 24 * 60 * 60 * 1000;
-
-            // Verifica se o exame está agendado E se a data dele já passou há mais de 24 horas.
             const isOverdue = exam.status === 'scheduled' && (now.getTime() - examDate.getTime()) > twentyFourHoursInMillis;
             
-            // Define as classes base do card
-            let cardClasses = 'exam-item bg-white p-2 rounded border shadow-sm text-sm';
-            
-            // Se estiver atrasado, adiciona as classes de destaque com um vermelho bem claro
+            let cardClasses = 'exam-item'; // A classe base será estilizada no CSS
             if (isOverdue) {
                 cardClasses += ' bg-red-50 border-red-200'; 
             }
@@ -3119,15 +3170,12 @@
             if (exam.timestamp && typeof exam.timestamp === 'number') {
                 switch(exam.status) {
                     case 'scheduled':
-                        // Para agendados, MANTÉM a lógica de "HOJE" e "Amanhã"
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
                         const tomorrow = new Date(today);
                         tomorrow.setDate(today.getDate() + 1);
-
                         const examDayOnly = new Date(examDate);
                         examDayOnly.setHours(0, 0, 0, 0);
-                        
                         const examTimeStr = examDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
                         if (examDayOnly.getTime() === today.getTime()) {
@@ -3140,25 +3188,20 @@
                         break;
 
                     case 'pending':
-                        // Para pendentes, USA APENAS a data e hora cruas, sem substituições.
                         formattedTime = examDate.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
                         break;
                     
                     default:
-                        // Fallback para qualquer outro caso
                         formattedTime = 'Não especificado';
                 }
             } else {
                 formattedTime = 'Não especificado';
             }
 
-            // --- 4. Montagem do HTML do card (permanece a mesma lógica) ---
-            let html = `<p class="font-bold text-gray-800">${exam.name}</p>`;
             let actionsHtml = '';
 
             switch (exam.status) {
                 case 'scheduled':
-                    html += `<p class="text-xs text-gray-500">Agendado para: ${formattedTime}</p>`;
                     actionsHtml = `
                         <button type="button" data-action="register-realization" title="Registrar Realização" class="text-blue-600 hover:text-blue-800 transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -3172,7 +3215,6 @@
                     `;
                     break;
                 case 'pending':
-                    html += `<p class="text-xs text-gray-500">Realizado em: ${formattedTime}</p>`;
                     actionsHtml = `
                         <button type="button" data-action="register-result" title="Registrar Resultado" class="text-blue-600 hover:text-blue-800 transition-colors">
                             <svg class="size-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 1 0-18c1.052 0 2.062.18 3 .512M7 9.577l3.923 3.923 8.5-8.5M17 14v6m-3-3h6"/></svg>
@@ -3185,9 +3227,12 @@
             }
             
             item.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <div>${html}</div>
-                    <div class="flex space-x-2 text-base">${actionsHtml}</div>
+                <div class="exam-info-container">
+                    <p class="font-bold text-gray-800">${exam.name}</p>
+                    <p class="text-xs text-gray-500">${exam.status === 'scheduled' ? 'Agendado para:' : 'Realizado em:'} ${formattedTime}</p>
+                </div>
+                <div class="exam-actions-container">
+                    ${actionsHtml}
                 </div>
             `;
             return item;
@@ -3467,8 +3512,35 @@
         // Botão principal "+ Novo Exame"
         addNewExamBtn.addEventListener('click', openEditorForNewExam);
 
-        // Botão "Cancelar" dentro do editor
-        editor.cancelBtn.addEventListener('click', resetAndCloseExamEditor);
+        // Botão "Voltar" dentro do editor
+        editor.backBtn.addEventListener('click', () => {
+            // Se a área de texto do resultado estiver visível, volta para a escolha de "Sim/Não".
+            if (!editor.resultTextareaWrapper.classList.contains('hidden')) {
+                editor.resultTextareaWrapper.classList.add('hidden');
+                editor.actionsWrapper.classList.add('hidden'); // Esconde os botões Salvar/Voltar
+                editor.resultChoiceWrapper.classList.remove('hidden'); // Mostra os botões Sim/Não
+                return; 
+            }
+
+            // Se o seletor de data/hora ou a escolha de resultado estiverem visíveis...
+            if (!editor.datetimeWrapper.classList.contains('hidden') || !editor.resultChoiceWrapper.classList.contains('hidden')) {
+                editor.datetimeWrapper.classList.add('hidden');
+                editor.resultChoiceWrapper.classList.add('hidden');
+                editor.actionsWrapper.classList.add('hidden');
+
+                // ...e for um exame NOVO, volta para a escolha de fluxo (Agendar/Registrar).
+                if (editor.mode.value === 'new') {
+                    editor.flowChoiceWrapper.classList.remove('hidden');
+                } else {
+                    // ...se for uma edição, reagendamento, etc., simplesmente fecha o editor.
+                    resetAndCloseExamEditor();
+                }
+                return;
+            }
+            
+            // Em qualquer outro caso (como estar no primeiro passo), a ação de "Voltar" fecha o editor.
+            resetAndCloseExamEditor();
+        });
 
         // Botão "X"
         if (closeExamEditorBtn) {
@@ -4292,13 +4364,10 @@
             // Ação: Clicou fora de um módulo em edição
             const openModule = document.querySelector('.module-editing');
             if (openModule && !e.target.closest('.module-editing')) {
-
-                } else {
-                    // Comportamento padrão para todos os outros módulos
-                    exitEditMode(openModule);
-                }
+                exitEditMode(openModule);
             }
-        );
+        });
+
 
         /**
          * Esconde a lista de autocomplete ou seletor customizado ativo,
@@ -4341,80 +4410,6 @@
             }
         }
 
-        // --- LISTENER CORRIGIDO E ROBUSTO PARA EVENTOS DE 'KEYDOWN' (TECLA PRESSIONADA) NO FORMULÁRIO ---
-        addHandoversForm.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const targetInput = e.target;
-                const inputValue = targetInput.value.trim();
-                // Lógica para alergias
-                if (targetInput.id === 'form-allergies') {
-                    e.preventDefault();
-                    const moduleCard = targetInput.closest('#module-diagnostico');
-                    if (inputValue) {
-                        const container = document.getElementById('allergies-tags-container');
-                        container.appendChild(createListItem(inputValue));
-                        targetInput.value = '';
-                        setUnsavedChanges(true);
-                        updateDiagnosisSummary();
-                        updateAllergyTitleVisibility(); // Atualiza o título após adicionar tag
-                    } else {
-                        // Enter com campo vazio: fecha o input E o modo de edição
-                        targetInput.parentElement.classList.add('hidden');
-                        if (moduleCard) {
-                            exitEditMode(moduleCard); 
-                        }
-                        updateAllergyTitleVisibility(); // Atualiza o título ao fechar
-                    }
-                    return;
-                }
-
-                // Mapeamento dos inputs que devem criar tags com Enter
-                const enterToAddTagMap = {
-                    'form-comorbidities': { containerId: 'comorbidities-tags-container' },
-                    'form-precaucoes':    { containerId: 'precaucoes-container' },
-                };
-
-                const config = enterToAddTagMap[targetInput.id];
-
-                // Se o input for um dos mapeados e tiver texto
-                if (config) {
-                    e.preventDefault();
-
-                    if (inputValue) {
-                        const moduleCard = targetInput.closest('.bg-white.rounded-lg.shadow');
-                        
-                        if (config.isDevice) {
-                            addCustomDispositivo(inputValue, true);
-                        } else {
-                            const container = document.getElementById(config.containerId);
-                            container.appendChild(createListItem(inputValue));
-                        }
-                        
-                        setUnsavedChanges(true);
-                        if (config.containerId === 'comorbidities-tags-container' || config.containerId === 'diagnoses-tags-container') {
-                            updateDiagnosisSummary();
-                        }
-                        
-                        if (moduleCard) {
-                            // ALTERADO: Lógica de UI agora está aqui
-                            const triggerWrapper = moduleCard.querySelector('.trigger-wrapper');
-                            const cancelWrapper = moduleCard.querySelector('.cancel-action-wrapper');
-                            const inputWrapper = moduleCard.querySelector('.input-wrapper');
-                            
-                            triggerWrapper?.classList.remove('hidden');
-                            cancelWrapper?.classList.add('hidden');
-                            inputWrapper?.classList.add('hidden');
-                            if(targetInput) targetInput.value = '';
-
-                            exitEditMode(moduleCard);
-                        }
-                    }
-                } else if (targetInput.tagName !== 'TEXTAREA') {
-                    e.preventDefault();
-                }
-            }
-        });
-
         // Função para finalizar a edição de um campo de monitoramento
         function finishMonitoringInputEdit(inputElement) {
             const value = inputElement.value.trim();
@@ -4456,275 +4451,6 @@
             }
         });
 
-        addHandoversForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (checkForInvalidInputs()) {
-                showToast("Corrija os valores inválidos no monitoramento antes de salvar.", 3500);
-                return; // Impede o restante da função de ser executado
-            }
-
-            const submitButton = e.target.querySelector('button[type="submit"]');
-            submitButton.disabled = true;
-            submitButton.innerHTML = `<div class="flex items-center justify-center">...Salvando...</div>`;
-
-            try {
-                // Se algum módulo ainda estiver em modo de edição, fecha ele antes de salvar.
-                const openModule = document.querySelector('.module-editing');
-                if (openModule && openModule.id !== 'module-medicacoes' && openModule.id !== 'module-exames') {
-                    exitEditMode(openModule);
-                }
-
-                const batch = writeBatch(db);
-                const patientRef = doc(db, 'patients', currentPatientId);
-                const newHandoverRef = doc(collection(patientRef, 'handovers'));
-
-                // --- INÍCIO DA CORREÇÃO ---
-                // 1. DADOS VITAIS E SCORES SÃO CALCULADOS PRIMEIRO
-                // Coleta todos os dados de monitoramento do formulário (com fallback para o estado anterior se vazio)
-                const finalVitalsForSave = getFinalVitalsData();
-                
-                // Calcula o NEWS2 com os dados mais recentes
-                const news2Result = calculateNEWS2(finalVitalsForSave);
-
-                // Coleta os dispositivos atuais para o cálculo do Fugulin
-                const devicesToSave = Array.from(document.querySelectorAll('#dispositivos-grid input[type="checkbox"]:checked')).map(chk => chk.value);
-
-                // Calcula o Fugulin com os dados mais recentes
-                const fugulinResult = calculateFugulin({
-                    news2: news2Result,
-                    dispositivos: devicesToSave,
-                    medicationsAdministered: administeredInShift,
-                    consciencia: finalVitalsForSave.consciencia,
-                    cuidadoCorporal: getFugulinScoreFromDOMorState('cuidadoCorporal'),
-                    motilidade:     getFugulinScoreFromDOMorState('motilidade'),
-                    deambulacao:    getFugulinScoreFromDOMorState('deambulacao'),
-                    alimentacao:    getFugulinScoreFromDOMorState('alimentacao'),
-                    eliminacao:     getFugulinScoreFromDOMorState('eliminacao')
-                });
-
-                // 2. DADOS DOS OUTROS MÓDULOS SÃO COLETADOS
-                const allergyRadioNo = document.getElementById('allergy-radio-no');
-                let currentAllergies = allergyRadioNo && allergyRadioNo.checked 
-                    ? [] 
-                    : getItemsFromContainer('allergies-tags-container');
-
-                const currentDiagnoses = getItemsFromContainer('diagnoses-tags-container');
-                const currentComorbidities = getItemsFromContainer('comorbidities-tags-container');
-                const currentPrecautions = getItemsFromContainer('precaucoes-container');
-                const currentRisks = {
-                    lpp: getItemsFromContainer('riscos-lpp-container'),
-                    quedas: getItemsFromContainer('riscos-quedas-container'),
-                    bronco: getItemsFromContainer('riscos-bronco-container'),
-                    iras: getItemsFromContainer('riscos-iras-container')
-                };
-                
-                const getFinalCareItem = (key) => {
-                    const kebabKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-                    const items = getItemsFromContainer(`fugulin-${kebabKey}-container`);
-                    if (items.length > 0) return items;
-                    return originalPatientState.nursingCare?.[key] || [];
-                };
-                
-                const nursingCareData = {
-                    cuidadoCorporal: getFinalCareItem('cuidadoCorporal'),
-                    motilidade:      getFinalCareItem('motilidade'),
-                    deambulacao:     getFinalCareItem('deambulacao'),
-                    alimentacao:     getFinalCareItem('alimentacao'),
-                    eliminacao:      getFinalCareItem('eliminacao')
-                };
-
-                const evolutionText = document.getElementById('form-evolution').value.trim();
-                const pendingObsText = document.getElementById('form-pending-obs').value.trim();
-                
-                // Monta o objeto de monitoramento para o handover usando os dados já coletados
-                // Apenas os dados que foram efetivamente inseridos no formulário neste plantão serão salvos.
-                const monitoringDataForHistory = {};
-                const paInput = document.getElementById('form-sv-pa').value.trim();
-                if (paInput) monitoringDataForHistory.pa = paInput;
-
-                const fcInput = document.getElementById('form-sv-fc').value.trim();
-                if (fcInput) monitoringDataForHistory.fc = fcInput;
-
-                const frInput = document.getElementById('form-sv-fr').value.trim();
-                if (frInput) monitoringDataForHistory.fr = frInput;
-
-                const sato2Input = document.getElementById('form-sv-sato2').value.trim();
-                if (sato2Input) monitoringDataForHistory.sato2 = sato2Input;
-
-                const tempInput = document.getElementById('form-sv-temp').value.trim();
-                if (tempInput) monitoringDataForHistory.temp = tempInput;
-
-                const hgtInput = document.getElementById('form-sv-hgt').value.trim();
-                if (hgtInput) monitoringDataForHistory.hgt = hgtInput;
-
-                const othersInput = document.getElementById('form-sv-others').value.trim();
-                if (othersInput) monitoringDataForHistory.others = othersInput;
-
-                // O estado do checkbox de O2 e o nível de consciência são sempre informações do plantão atual.
-                monitoringDataForHistory.o2Supplement = document.getElementById('form-sv-o2').checked;
-                const conscienciaTag = document.querySelector('#monitoring-consciencia-container .item-text');
-                if (conscienciaTag) {
-                    monitoringDataForHistory.consciencia = [conscienciaTag.dataset.value];
-                }
-                
-                const scheduledExamsToSave = patientExams.filter(e => e.status === 'scheduled');
-                const pendingExamsToSave = patientExams.filter(e => e.status === 'pending');
-                const completedExamsThisShift = [...currentShiftCompletedExams];
-
-                // 3. AGORA, OS OBJETOS SÃO CONSTRUÍDOS COM OS DADOS CORRETOS E JÁ CALCULADOS
-                const handoverData = {
-                    professionalId: currentUser.uid, professionalName: currentUser.displayName,
-                    timestamp: serverTimestamp(),
-                    evolution: evolutionText,
-                    pendingObs: pendingObsText,
-                    monitoring: monitoringDataForHistory,
-                    nursingCare: nursingCareData,
-                    news2: news2Result, // <- Agora usa a variável correta
-                    fugulin: fugulinResult, // <- Agora usa a variável correta
-                    risks: currentRisks,
-                    medicationsAdministered: administeredInShift,
-                    newlyPrescribed: activePrescriptions.filter(p => !originalPatientState.activeMedicationPrescriptions?.some(op => op.id === p.id)),
-                    examsDone: completedExamsThisShift,
-                    diagnoses: currentDiagnoses,
-                    comorbidities: currentComorbidities,
-                    allergies: currentAllergies,
-                    precautions: currentPrecautions,
-                    devices: devicesToSave,
-                    scheduledExams: scheduledExamsToSave,
-                    pendingExams: pendingExamsToSave,
-                    rescheduledExams: currentShiftRescheduledExams,
-                    changes: {
-                        diagnoses: calculateDelta(originalPatientState.diagnoses, currentDiagnoses),
-                        comorbidities: calculateDelta(originalPatientState.comorbidities, currentComorbidities),
-                        allergies: calculateDelta(originalPatientState.allergies, currentAllergies),
-                        precautions: calculateDelta(originalPatientState.precautions, currentPrecautions),
-                        devices: calculateDelta(originalPatientState.devices, devicesToSave),
-                        risks: {
-                            lpp: calculateDelta(originalPatientState.risks.lpp, currentRisks.lpp),
-                            quedas: calculateDelta(originalPatientState.risks.quedas, currentRisks.quedas),
-                            bronco: calculateDelta(originalPatientState.risks.bronco, currentRisks.bronco),
-                            iras: calculateDelta(originalPatientState.risks.iras, currentRisks.iras),
-                        },
-                        nursingCare: {
-                            cuidadoCorporal: calculateDelta(originalPatientState.nursingCare.cuidadoCorporal, nursingCareData.cuidadoCorporal),
-                            motilidade: calculateDelta(originalPatientState.nursingCare.motilidade, nursingCareData.motilidade),
-                            deambulacao: calculateDelta(originalPatientState.nursingCare.deambulacao, nursingCareData.deambulacao),
-                            alimentacao: calculateDelta(originalPatientState.nursingCare.alimentacao, nursingCareData.alimentacao),
-                            eliminacao: calculateDelta(originalPatientState.nursingCare.eliminacao, nursingCareData.eliminacao),
-                        },
-                        fugulinScoreChange: (originalPatientState.lastFugulinScore !== fugulinResult.score)
-                            ? { from: originalPatientState.lastFugulinScore || 'N/A', to: fugulinResult.score }
-                            : null,
-                        scheduledExams: calculateDeltaForExams(originalPatientState.scheduledExams, scheduledExamsToSave),
-                        pendingExams: calculateDeltaForExams(originalPatientState.pendingExams, pendingExamsToSave),
-                    }
-                };
-
-                const patientUpdateData = {
-                    lastUpdatedAt: serverTimestamp(),
-                    lastProfessionalName: currentUser.displayName,
-                    activeDiagnoses: currentDiagnoses,
-                    activeComorbidities: currentComorbidities,
-                    activeAllergies: currentAllergies,
-                    activeDevices: devicesToSave,
-                    activePrecautions: currentPrecautions,
-                    activeRisks: currentRisks,
-                    activeNursingCare: nursingCareData,
-                    activeScheduledExams: scheduledExamsToSave,
-                    activePendingExams: pendingExamsToSave,
-                    lastNews2Score: news2Result.score, // <- Agora usa a variável correta
-                    lastNews2Level: news2Result.level, // <- Agora usa a variável correta
-                    lastFugulinScore: fugulinResult.score, // <- Agora usa a variável correta
-                    lastFugulinClassification: fugulinResult.classification, // <- Agora usa a variável correta
-                    activeMedicationPrescriptions: activePrescriptions,
-                    lastEvolution: evolutionText,
-                    lastPendingObs: pendingObsText,
-                    completedExams: arrayUnion(...completedExamsThisShift)
-                };
-                // --- FIM DA CORREÇÃO ---
-
-                console.log("DADOS DO HANDOVER A SEREM SALVOS:", JSON.parse(JSON.stringify(handoverData)));
-                console.log("DADOS DO PACIENTE A SEREM ATUALIZADOS:", JSON.parse(JSON.stringify(patientUpdateData)));
-
-                batch.set(newHandoverRef, handoverData);
-                batch.update(patientRef, patientUpdateData);
-                await batch.commit();
-
-                showToast("Passagem de plantão salva com sucesso!");
-
-                currentPatientData = { ...currentPatientData, ...patientUpdateData };
-
-                originalPatientState = {
-                    ...originalPatientState,
-                    ...patientUpdateData,
-                    monitoring: finalVitalsForSave,
-                    evolution: evolutionText,
-                    pendingObs: pendingObsText
-                };
-
-                const patientIndex = currentPatientList.findIndex(p => p.id === currentPatientId);
-                if (patientIndex !== -1) {
-                    currentPatientList[patientIndex] = {
-                        ...currentPatientList[patientIndex],
-                        ...patientUpdateData,
-                        lastUpdatedAt: Timestamp.now()
-                    };
-                }
-
-                const newHandoverForUI = { ...handoverData, id: newHandoverRef.id, timestamp: Timestamp.now() };
-                currentHandovers.unshift(newHandoverForUI);
-
-                // Atualiza o cabeçalho da página de detalhes com os DADOS CORRETOS
-                const patientDetailNews2 = document.getElementById('patient-detail-news2');
-                const patientDetailFugulin = document.getElementById('patient-detail-fugulin');
-
-                // Atualiza a tag NEWS2 no cabeçalho
-                if (patientUpdateData.lastNews2Score !== undefined && patientUpdateData.lastNews2Level) {
-                    const news2Classes = { 'Risco Baixo': 'news2-low', 'Risco Baixo-Médio': 'news2-low-medium', 'Risco Médio': 'news2-medium', 'Risco Alto': 'news2-high' };
-                    const badgeClass = news2Classes[patientUpdateData.lastNews2Level] || 'bg-gray-100 text-gray-800';
-                    patientDetailNews2.innerHTML = `<span class="text-xs font-medium px-2.5 py-0.5 rounded-full ${badgeClass}">NEWS: ${patientUpdateData.lastNews2Score} - ${patientUpdateData.lastNews2Level}</span>`;
-                }
-
-                // Atualiza a tag Fugulin no cabeçalho
-                if (patientUpdateData.lastFugulinClassification) {
-                    const fugulinClasses = { 'Cuidados Mínimos': 'fugulin-minimos', 'Cuidados Intermediários': 'fugulin-intermediarios', 'Cuidados de Alta Dependência': 'fugulin-alta-dependencia', 'Cuidados Semi-Intensivos': 'fugulin-semi-intensivos', 'Cuidados Intensivos': 'fugulin-intensivos' };
-                    const badgeClass = fugulinClasses[patientUpdateData.lastFugulinClassification] || 'bg-gray-100 text-gray-800';
-                    patientDetailFugulin.innerHTML = `<span class="status-badge text-xs font-medium px-2.5 py-0.5 rounded-full ${badgeClass}">Fugulin: ${patientUpdateData.lastFugulinScore} - ${patientUpdateData.lastFugulinClassification}</span>`;
-                }
-                
-                renderHandoversList(currentHandovers);
-                partiallyResetFormForNewShift();
-
-            } catch (error) {
-                console.error("Erro ao salvar passagem de plantão:", error);
-                showToast(`Erro ao salvar: ${error.message}`, 'error');
-            } finally {
-                submitButton.disabled = false;
-                submitButton.textContent = 'Salvar Passagem de Plantão';
-                setUnsavedChanges(false);
-            }
-        });
-        
-        /**
-         * Listener global para detectar cliques fora de um módulo em edição.
-         * Se um clique ocorrer fora, o módulo volta ao seu estado normal (como se "Confirmar" fosse clicado).
-         */
-        window.addEventListener('click', (e) => {
-            // 1. Procura se existe algum módulo em modo de edição
-            const editingModule = document.querySelector('.module-editing');
-            
-            // 2. Se não houver nenhum, não faz nada
-            if (!editingModule) {
-                return;
-            }
-
-            // 3. Verifica se o alvo do clique (e.target) NÃO está dentro do módulo em edição
-            // O .closest() retorna null se o clique for fora do elemento especificado.
-            if (!e.target.closest('.module-editing')) {
-                // 4. Se o clique foi fora, chama a função para sair do modo de edição
-                exitEditMode(editingModule);
-            }
-        });
         
         // --- FUNÇÕES DE DADOS ---
 
@@ -4753,19 +4479,30 @@
          * @param {string} currentStep - O nome do passo a ser exibido.
          */
         function showMedicationEditorStep(currentStep) {
+            // Esconde todos os passos (exceto o container de ações, que será controlado separadamente)
             Object.entries(medSteps).forEach(([key, element]) => {
-                if (key === currentStep || currentStep.startsWith(key)) {
-                    element.classList.remove('hidden');
-                } else {
+                if (key !== 'actions') {
                     element.classList.add('hidden');
                 }
             });
 
-            // Mostra os botões de ação final apenas nos passos corretos
-            if (currentStep === 'step3b' || currentStep === 'step4') {
-                medSteps.actions.classList.remove('hidden');
-            } else {
+            // Mostra o passo atual
+            if (medSteps[currentStep]) {
+                medSteps[currentStep].classList.remove('hidden');
+            }
+
+            // 1. O container de ações (que tem Voltar e Salvar) aparece em todos os passos, exceto o primeiro.
+            if (currentStep === 'step1') {
                 medSteps.actions.classList.add('hidden');
+            } else {
+                medSteps.actions.classList.remove('hidden');
+            }
+
+            // 2. O botão "Salvar" só aparece nos passos finais.
+            if (currentStep === 'step3b' || currentStep === 'step4') {
+                medEditor.saveBtn.classList.remove('hidden');
+            } else {
+                medEditor.saveBtn.classList.add('hidden');
             }
         }
 
@@ -4775,60 +4512,88 @@
          * @param {'active' | 'administered'} listType - O tipo de lista.
          * @returns {HTMLElement} - O elemento do item da lista.
          */
-        function createMedicationListItem(medDose, listType) {
+        function createMedicationListItem(medDoseOrGroup, listType) {
             const item = document.createElement('div');
-            item.className = 'medication-list-item';
-            item.dataset.doseId = medDose.id;
+            item.className = 'medication-list-item'; 
 
-            const now = new Date();
-            const isOverdue = listType === 'active' && medDose.time < now;
-            if (isOverdue) {
-                item.classList.add('is-overdue');
-            }
+            if (listType === 'active') {
+                const medDose = medDoseOrGroup;
+                item.dataset.doseId = medDose.id;
+                item.dataset.prescriptionId = medDose.prescriptionId;
 
-            const timeString = medDose.time.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            const dateString = medDose.time.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                const now = new Date();
+                const isOverdue = medDose.time < now;
+                if (isOverdue) {
+                    item.classList.add('is-overdue');
+                }
 
-            let actionsHtml = '';
-                if (listType === 'active') {
-                    actionsHtml = `
+                const timeString = medDose.time.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const dateString = medDose.time.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                const formattedDose = formatDose(medDose.dose);
+                
+                let displayInfoHtml = '';
+                if (medDose.displayInfo) {
+                    // Mantém o tooltip completo e exibe apenas a frequência no card
+                    const frequencyPart = medDose.displayInfo.split(',')[0];
+                    displayInfoHtml = `<span class="med-info-icon" title="${medDose.displayInfo}">${frequencyPart})</span>`;
+                }
+                
+                const timesHtml = `<li>${timeString} <span class="text-gray-400">(${dateString})</span></li>`;
+
+                item.innerHTML = `
+                    <div class="med-info-container">
+                        <p class="medication-list-item-name">${medDose.name}</p>
+                        <p class="medication-list-item-dose">${formattedDose}</p>
+                        <p class="medication-list-item-freq">${displayInfoHtml}</p>
+                        <ul class="medication-list-item-times-administered">
+                            ${timesHtml}
+                        </ul>
+                    </div>
+                    <div class="medication-list-item-actions">
                         <button type="button" class="med-action-btn text-blue-600" data-action="edit" title="Editar Prescrição">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
                         </button>
                         <button type="button" class="med-action-btn text-green-600" data-action="administer" title="Administrar">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         </button>
-                    `;
-                } else { // 'administered'
-                    actionsHtml = `
+                    </div>
+                `;
+            } else { // 'administered'
+                const group = medDoseOrGroup;
+                const representativeDose = group.doses[0];
+                item.dataset.prescriptionId = representativeDose.prescriptionId;
+
+                const countHtml = group.doses.length > 1 ? `<span class="med-dose-count">${group.doses.length}x</span>` : '';
+                const formattedDose = formatDose(representativeDose.dose);
+
+                const timesHtml = group.doses
+                    .sort((a, b) => a.time.getTime() - b.time.getTime())
+                    .map(d => `<li>${d.time.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} <span class="text-gray-400">(${d.time.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span></li>`)
+                    .join('');
+
+                item.innerHTML = `
+                    <div class="med-info-container">
+                        <p class="medication-list-item-name">${countHtml} ${representativeDose.name}</p>
+                        <p class="medication-list-item-dose">${formattedDose}</p>
+                        <ul class="medication-list-item-times-administered">
+                            ${timesHtml}
+                        </ul>
+                    </div>
+                    <div class="medication-list-item-actions">
                         <button type="button" class="med-action-btn text-blue-600" data-action="add-dose" title="Adicionar outra dose">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" /></svg>
                         </button>
-                        <button type="button" class="med-action-btn text-red-600" data-action="delete" title="Excluir Registro">
+                        <button type="button" class="med-action-btn text-red-600" data-action="delete" title="Excluir último registro">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" /></svg>
                         </button>
-                    `;
-                }
-
-            item.innerHTML = `
-                <div class="medication-list-item-header">
-                    <div>
-                        <p class="medication-list-item-name">${medDose.name}</p>
-                        <p class="medication-list-item-dose">${medDose.dose} <span class="text-blue-600 font-normal">${medDose.displayInfo || ''}</span></p>
                     </div>
-                    <div class="medication-list-item-actions">
-                        ${actionsHtml}
-                    </div>
-                </div>
-                <p class="medication-list-item-time">
-                    ${isOverdue ? 'Atrasado - ' : ''}Horário: <strong>${timeString}</strong> (${dateString})
-                </p>
-            `;
+                `;
+            }
             return item;
         }
 
         /**
-         * Renderiza ambas as listas de medicação, mostrando apenas as doses relevantes.
+         * Renderiza ambas as listas de medicação, gerando doses futuras a partir das prescrições.
          */
         function renderMedicationLists() {
             const activeList = document.getElementById('active-prescriptions-list');
@@ -4836,53 +4601,59 @@
 
             activeList.innerHTML = '';
             administeredList.innerHTML = '';
-            const now = new Date();
+            
+            dosesToRender = []; 
+            const administeredThisShiftIds = new Set(administeredInShift.map(d => d.id));
 
-            // 1. Agrupa todas as doses ativas por sua prescrição
-            const prescriptions = activePrescriptions.reduce((acc, dose) => {
-                const id = dose.prescriptionId;
-                if (!acc[id]) {
-                    acc[id] = [];
-                }
-                acc[id].push(dose);
-                return acc;
-            }, {});
-
-            const dosesToRender = [];
-
-            // 2. Para cada prescrição, decide quais doses mostrar
-            for (const prescriptionId in prescriptions) {
-                const allDoses = prescriptions[prescriptionId].sort((a, b) => a.time.getTime() - b.time.getTime());
-                const overdueDoses = allDoses.filter(d => d.time < now);
-                const futureDoses = allDoses.filter(d => d.time >= now);
-
-                // Adiciona todas as doses atrasadas
-                dosesToRender.push(...overdueDoses);
-
-                // Adiciona apenas a próxima dose futura
-                if (futureDoses.length > 0) {
-                    const nextDose = futureDoses[0];
-                    // Adiciona informações extras para o card da próxima dose
-                    if (prescriptionId.startsWith('cont_')) {
-                        const lastDose = futureDoses[futureDoses.length - 1];
-                        const remainingDays = Math.ceil((lastDose.time.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                        nextDose.displayInfo = `(a cada ${nextDose.frequency}h, por mais ${remainingDays} dia(s))`;
+            activePrescriptions.forEach(p => {
+                if (p.type === 'single') {
+                    const dose = { ...p, id: p.prescriptionId };
+                    if (!administeredThisShiftIds.has(dose.id)) {
+                        dosesToRender.push(dose);
                     }
-                    dosesToRender.push(nextDose);
-                }
-            }
+                } else if (p.type === 'continuous') {
+                    const totalHours = p.duration * 24;
+                    let nextDoseFound = false;
+                    for (let h = 0; h < totalHours; h += p.frequency) {
+                        const doseTime = new Date(p.startTime.getTime() + h * 60 * 60 * 1000);
+                        const doseId = `${p.prescriptionId}_${doseTime.getTime()}`;
 
-            // 3. Renderiza a lista de prescrições ativas filtrada
+                        if (!administeredThisShiftIds.has(doseId) && !nextDoseFound) {
+                            const remainingHours = (p.startTime.getTime() + totalHours * 60 * 60 * 1000) - doseTime.getTime();
+                            const remainingDays = Math.ceil(remainingHours / (1000 * 60 * 60 * 24));
+                            dosesToRender.push({
+                                ...p,
+                                id: doseId,
+                                time: doseTime,
+                                displayInfo: `(a cada ${p.frequency}h, por mais ${remainingDays} dia(s))`
+                            });
+                            nextDoseFound = true;
+                        }
+                    }
+                }
+            });
+            
             dosesToRender.sort((a, b) => a.time.getTime() - b.time.getTime());
             dosesToRender.forEach(dose => {
                 activeList.appendChild(createMedicationListItem(dose, 'active'));
             });
 
-            // 4. Renderiza a lista de administrados (sem alteração)
-            administeredInShift.sort((a, b) => b.time.getTime() - a.time.getTime());
-            administeredInShift.forEach(dose => {
-                administeredList.appendChild(createMedicationListItem(dose, 'administered'));
-            });
+            const groupedAdministered = administeredInShift.reduce((acc, dose) => {
+                const key = dose.prescriptionId;
+                if (!acc[key]) {
+                    acc[key] = { doses: [] };
+                }
+                acc[key].doses.push(dose);
+                return acc;
+            }, {});
+
+            Object.values(groupedAdministered)
+                .sort((a, b) => b.doses[0].time.getTime() - a.doses[0].time.getTime())
+                .forEach(group => {
+                    administeredList.appendChild(createMedicationListItem(group, 'administered'));
+                });
+
+            updateMedicationSummary();
         }
 
         /**
@@ -4934,58 +4705,79 @@
                 flatpickr("#med-editor-start-time", { ...configAgendamento, defaultDate: representativeDose.time });
             }
         }
+
         /**
-         * Simula a busca por todas as medicações agendadas e atrasadas da unidade.
-         * ESTA FUNÇÃO SERÁ SUBSTITUÍDA PELA LÓGICA REAL NO FUTURO.
+         * Busca no Firestore por todas as doses de medicação atrasadas e a próxima dose futura
+         * para todos os pacientes ativos na unidade.
          * @returns {Promise<Array>} Uma promessa que resolve para um array de objetos de medicação.
          */
         async function getUpcomingAndOverdueMedications() {
-            console.log("Buscando medicações da unidade (usando dados de exemplo)...");
-            // Simulação: Pegar todos os pacientes e verificar suas prescrições
-            // Por agora, vamos retornar um array fixo para testar a UI.
-            const now = new Date().getTime();
-            const oneHour = 60 * 60 * 1000;
+            console.log("Buscando medicações atrasadas e a próxima dose da unidade do Firestore...");
+            const relevantDoses = [];
+            const now = new Date();
 
-            // Encontra pacientes na lista atual para usar nomes e leitos reais
-            const patient1 = currentPatientList[0];
-            const patient2 = currentPatientList[1];
+            const activePatients = currentPatientList;
 
-            const mockMedications = [];
+            for (const patient of activePatients) {
+                if (patient.activeMedicationPrescriptions && patient.activeMedicationPrescriptions.length > 0) {
+                    for (const p of patient.activeMedicationPrescriptions) {
+                        const prescription = { ...p };
+                        if (p.time?.toDate) prescription.time = p.time.toDate();
+                        if (p.startTime?.toDate) prescription.startTime = p.startTime.toDate();
 
-            if (patient1) {
-                mockMedications.push({
-                    patientId: patient1.id,
-                    patientName: patient1.name,
-                    roomNumber: patient1.roomNumber,
-                    patientNumber: patient1.patientNumber,
-                    medicationName: 'Dipirona 500mg',
-                    dose: '1 cp',
-                    time: new Date(now - (2 * oneHour)), // Atrasado 2 horas
-                });
+                        const allPotentialDoses = [];
+
+                        if (prescription.type === 'single') {
+                            allPotentialDoses.push({
+                                ...prescription,
+                                patientId: patient.id,
+                                patientName: patient.name,
+                                roomNumber: patient.roomNumber,
+                                patientNumber: patient.patientNumber,
+                                medicationName: prescription.name,
+                                dose: formatDose(prescription.dose),
+                                time: prescription.time
+                            });
+                        } else if (prescription.type === 'continuous') {
+                            const totalHours = prescription.duration * 24;
+                            for (let h = 0; h < totalHours; h += prescription.frequency) {
+                                const doseTime = new Date(prescription.startTime.getTime() + h * 60 * 60 * 1000);
+                                allPotentialDoses.push({
+                                    ...prescription,
+                                    patientId: patient.id,
+                                    patientName: patient.name,
+                                    roomNumber: patient.roomNumber,
+                                    patientNumber: patient.patientNumber,
+                                    medicationName: prescription.name,
+                                    dose: formatDose(prescription.dose),
+                                    time: doseTime,
+                                });
+                            }
+                        }
+
+                        // Filtra doses já administradas no plantão atual
+                        const administeredInShiftIds = new Set(administeredInShift.map(d => `${d.prescriptionId}_${d.time.getTime()}`));
+                        const unadministeredDoses = allPotentialDoses.filter(dose => {
+                            const doseId = `${dose.prescriptionId}_${dose.time.getTime()}`;
+                            return !administeredInShiftIds.has(doseId);
+                        });
+
+                        const overdue = unadministeredDoses.filter(d => d.time < now);
+                        const upcoming = unadministeredDoses.filter(d => d.time >= now).sort((a, b) => a.time - b.time);
+                        
+                        // Adiciona todas as atrasadas
+                        relevantDoses.push(...overdue);
+                        
+                        // Adiciona apenas a primeira próxima
+                        if (upcoming.length > 0) {
+                            relevantDoses.push(upcoming[0]);
+                        }
+                    }
+                }
             }
-
-            if (patient2) {
-                mockMedications.push({
-                    patientId: patient2.id,
-                    patientName: patient2.name,
-                    roomNumber: patient2.roomNumber,
-                    patientNumber: patient2.patientNumber,
-                    medicationName: 'Amoxicilina 250mg',
-                    dose: '5 ml',
-                    time: new Date(now + (1 * oneHour)), // Daqui a 1 hora
-                });
-                mockMedications.push({
-                    patientId: patient2.id,
-                    patientName: patient2.name,
-                    roomNumber: patient2.roomNumber,
-                    patientNumber: patient2.patientNumber,
-                    medicationName: 'Losartana 50mg',
-                    dose: '1 cp',
-                    time: new Date(now + (3 * oneHour)), // Daqui a 3 horas
-                });
-            }
-
-            return mockMedications;
+            
+            console.log(`Encontradas ${relevantDoses.length} doses relevantes (atrasadas + próximas) na unidade.`);
+            return relevantDoses;
         }
 
         /**
@@ -5167,11 +4959,24 @@
                         break;
 
                     case 'medicacoes':
-                        if (h.medicationsAdministered && h.medicationsAdministered.length > 0) {
-                            moduleEntryContent += `<div><strong>Administrações no plantão:</strong><ul class="list-disc pl-5">${h.medicationsAdministered.map(m => `<li><strong>${m.name} ${m.dose}</strong> às ${formatDate(m.time)}</li>`).join('')}</ul></div>`;
+                        let medLog = '';
+                        const medChanges = h.changes?.medications || {};
+
+                        if (medChanges.administered?.length > 0) {
+                            medLog += medChanges.administered.map(m => `<li><span class="text-green-600">✓</span> Administrou <strong>${m.name} ${formatDose(m.dose)}</strong></li>`).join('');
                         }
-                        if (h.newlyPrescribed && h.newlyPrescribed.length > 0) {
-                            moduleEntryContent += `<div class="mt-2"><strong>Novas Prescrições:</strong><ul class="list-disc pl-5">${h.newlyPrescribed.map(m => `<li><strong>${m.name} ${m.dose}</strong> - Início em ${formatDate(m.time)}</li>`).join('')}</ul></div>`;
+                        if (medChanges.added?.length > 0) {
+                            medLog += medChanges.added.map(m => `<li><span class="text-blue-600">+</span> Prescreveu ${formatPrescriptionForHistory(m)}</li>`).join('');
+                        }
+                        if (medChanges.suspended?.length > 0) {
+                            medLog += medChanges.suspended.map(m => `<li><span class="text-red-600">❌</span> Suspendeu ${formatPrescriptionForHistory(m)}</li>`).join('');
+                        }
+                        if (medChanges.modified?.length > 0) {
+                            medLog += medChanges.modified.map(m => `<li><span class="text-yellow-500">🔄</span> Modificou prescrição de ${formatPrescriptionForHistory(m)}</li>`).join('');
+                        }
+
+                        if (medLog) {
+                            moduleEntryContent = `<ul class="list-none space-y-1">${medLog}</ul>`;
                         }
                         break;
 
@@ -5269,6 +5074,19 @@
                 age--;
             }
             return age;
+        }
+
+        /**
+         * Formata a descrição de uma prescrição para exibição em históricos.
+         * @param {object} med - O objeto da prescrição.
+         * @returns {string} - A string HTML formatada.
+         */
+        function formatPrescriptionForHistory(med) {
+            let details = `<strong>${med.name} ${formatDose(med.dose)}</strong>`;
+            if (med.type === 'continuous' && med.frequency && med.duration) {
+                details += ` (a cada ${med.frequency}h por ${med.duration} dia(s))`;
+            }
+            return details;
         }
 
         /**
@@ -5541,12 +5359,6 @@
             const fugulinResult = calculateFugulin(fugulinData);
             fugulinDisplay.textContent = `Fugulin: ${fugulinResult.score}`;
         }
-
-        // 3. Adiciona um único listener ao formulário para capturar todas as alterações
-        addHandoversForm.addEventListener('input', updateLiveScores);
-
-        // Garante a atualização também ao marcar/desmarcar o checkbox de O2
-        document.getElementById('form-sv-o2').addEventListener('change', updateLiveScores);
 
 
         function renderExamHistory(handovers) {
@@ -6146,6 +5958,129 @@
             }
         }
 
+        const medActionArea = document.getElementById('medication-action-area');
+        const actionAreaId = document.getElementById('action-area-id');
+        const actionAreaType = document.getElementById('action-area-type');
+        const actionAreaTitle = document.getElementById('action-area-title');
+        const actionAreaSubtitle = document.getElementById('action-area-subtitle');
+        const actionAreaDatetime = document.getElementById('action-area-datetime');
+        const actionAreaCancelBtn = document.getElementById('action-area-cancel-btn');
+        const actionAreaConfirmBtn = document.getElementById('action-area-confirm-btn');
+
+        /**
+         * Esconde todas as áreas de ação/edição e mostra a área de ação principal.
+         */
+        function resetMedicationModuleView() {
+            medActionArea.classList.add('hidden');
+            medEditorArea.classList.add('hidden');
+            medMainActionArea.classList.remove('hidden');
+            if (flatpickrInstance) {
+                flatpickrInstance.destroy();
+                flatpickrInstance = null;
+            }
+        }
+
+        /**
+         * Abre o editor inline para administrar uma dose agendada.
+         * @param {string} doseId - O ID da dose a ser administrada.
+         */
+        function openAdministerDoseEditor(doseId) {
+            const dose = dosesToRender.find(d => d.id === doseId);
+            if (!dose) return;
+
+            resetMedicationModuleView();
+            medMainActionArea.classList.add('hidden');
+            medActionArea.classList.remove('hidden');
+
+            actionAreaId.value = doseId;
+            actionAreaType.value = 'administer';
+            actionAreaTitle.textContent = `Confirmar Administração`;
+            actionAreaSubtitle.textContent = `${dose.name} ${formatDose(dose.dose)}`;
+            actionAreaConfirmBtn.textContent = 'Sim, Administrar';
+            const calendarConfig = {
+                ...configAgendamento, // Começa com a configuração que você gosta
+                minDate: null,       // Remove a restrição de data mínima
+                maxDate: new Date()  // Adiciona a restrição de data máxima (não permite registrar no futuro)
+            };
+            flatpickrInstance = flatpickr("#action-area-datetime", calendarConfig);
+            // A chamada .focus() foi removida para evitar que o calendário abra automaticamente.
+        }
+
+        /**
+         * Abre o editor inline para adicionar uma nova dose a uma prescrição existente.
+         * @param {string} prescriptionId - O ID da prescrição.
+         */
+        function openAddDoseEditor(prescriptionId) {
+            const originalDose = administeredInShift.find(d => d.prescriptionId === prescriptionId);
+            if (!originalDose) return;
+
+            resetMedicationModuleView();
+            medMainActionArea.classList.add('hidden');
+            medActionArea.classList.remove('hidden');
+
+            actionAreaId.value = prescriptionId;
+            actionAreaType.value = 'add-dose';
+            actionAreaTitle.textContent = `Registrar Nova Dose`;
+            actionAreaSubtitle.textContent = `${originalDose.name} ${formatDose(originalDose.dose)}`;
+            actionAreaConfirmBtn.textContent = 'Salvar Dose';
+            const calendarConfig = {
+                ...configAgendamento,
+                minDate: null,
+                maxDate: new Date()
+            };
+            flatpickrInstance = flatpickr("#action-area-datetime", calendarConfig);
+        }
+
+        // Listeners para os botões da nova área de ação
+        actionAreaCancelBtn.addEventListener('click', resetMedicationModuleView);
+
+        actionAreaConfirmBtn.addEventListener('click', () => {
+            const type = actionAreaType.value;
+            const id = actionAreaId.value;
+            const timeValue = actionAreaDatetime.value;
+
+            if (!timeValue) {
+                showToast("É necessário selecionar um horário.", "error");
+                return;
+            }
+
+            if (type === 'administer') {
+                const doseIndex = dosesToRender.findIndex(d => d.id === id);
+                if (doseIndex > -1) {
+                    const administeredDose = { ...dosesToRender[doseIndex] };
+                    administeredDose.time = flatpickr.parseDate(timeValue, "d/m/Y H:i");
+                    
+                    administeredInShift.push(administeredDose);
+
+                    const originalPrescriptionIndex = activePrescriptions.findIndex(p => p.prescriptionId === administeredDose.prescriptionId);
+                    if (originalPrescriptionIndex > -1) {
+                        if (activePrescriptions[originalPrescriptionIndex].type === 'single') {
+                            activePrescriptions.splice(originalPrescriptionIndex, 1);
+                        }
+                    }
+
+                    renderMedicationLists();
+                    setUnsavedChanges(true);
+                    showToast(`${administeredDose.name} administrado com sucesso!`, 'success');
+                }
+            } else if (type === 'add-dose') {
+                const originalDose = administeredInShift.find(d => d.prescriptionId === id);
+                if (originalDose) {
+                    const newDose = {
+                        ...originalDose,
+                        id: `med_${Date.now()}`,
+                        time: flatpickr.parseDate(timeValue, "d/m/Y H:i"),
+                    };
+                    administeredInShift.push(newDose);
+                    renderMedicationLists();
+                    setUnsavedChanges(true);
+                    showToast(`Nova dose de ${newDose.name} registrada.`, 'success');
+                }
+            }
+            
+            resetMedicationModuleView();
+        });
+
 
         // --- NOVO BLOCO DE FUNÇÕES PARA CARREGAMENTO PAGINADO ---
 
@@ -6391,29 +6326,20 @@
 
         /**
          * Verifica as medicações de todos os pacientes e atualiza a UI do painel.
-         * (ESTA É UMA SIMULAÇÃO E SERÁ MELHORADA)
          */
         async function updatePatientCardMedicationStatus() {
             const allMeds = await getUpcomingAndOverdueMedications();
             const now = new Date();
             const overduePatientIds = new Set();
-            let hasAnyOverdue = false;
-
+            
             allMeds.forEach(med => {
                 if (med.time < now) {
                     overduePatientIds.add(med.patientId);
-                    hasAnyOverdue = true;
                 }
             });
 
-            // Atualiza o ícone global de alerta
-            if (hasAnyOverdue) {
-                showUnitMedicationsButton.classList.add('has-overdue');
-                medicationAlertIndicator.classList.remove('hidden');
-            } else {
-                showUnitMedicationsButton.classList.remove('has-overdue');
-                medicationAlertIndicator.classList.add('hidden');
-            }
+            // Remove a lógica que alterava o ícone principal
+            // medicationAlertIndicator e has-overdue não são mais necessários aqui.
 
             // Atualiza cada card de paciente
             document.querySelectorAll('.patient-card, .patient-list-item').forEach(card => {
@@ -6819,39 +6745,40 @@
                 const handoversHistory = handoversSnapshot.docs.map(doc => doc.data());
                 const lastHandoverWithMonitoring = handoversHistory.find(h => h.monitoring && Object.values(h.monitoring).some(v => v));
 
-
                 resetFormState();
                 populateMonitoringModule(lastHandoverWithMonitoring ? lastHandoverWithMonitoring.monitoring : null);
 
-                // Captura o estado original de TODOS os módulos para calcular as mudanças depois
+                // 1. Limpa e carrega as prescrições PRIMEIRO
+                activePrescriptions = [];
+                administeredInShift = [];
+                if (patientData.activeMedicationPrescriptions) {
+                    activePrescriptions = patientData.activeMedicationPrescriptions.map(med => {
+                        const newMed = { ...med };
+                        if (med.time?.toDate) newMed.time = med.time.toDate();
+                        if (med.startTime?.toDate) newMed.startTime = med.startTime.toDate();
+                        return newMed;
+                    });
+                }
+                
+                // 2. AGORA, captura o estado original com os dados já carregados
                 originalPatientState = {
                     diagnoses: patientData.activeDiagnoses || [],
                     comorbidities: patientData.activeComorbidities || [],
                     allergies: patientData.activeAllergies || [],
                     precautions: patientData.activePrecautions || [],
                     risks: patientData.activeRisks || { lpp: [], quedas: [], bronco: [], iras: [] },
-                    nursingCare: patientData.activeNursingCare || { mobilidade: [], dieta: [], respiracao: [], eliminacoes: [], pele: [] },
+                    nursingCare: patientData.activeNursingCare || { cuidadoCorporal: [], motilidade: [], deambulacao: [], alimentacao: [], eliminacao: [] },
                     devices: patientData.activeDevices || [],
                     scheduledExams: patientData.activeScheduledExams || [],
                     pendingExams: patientData.activePendingExams || [],
-                    // Adiciona os campos de texto para comparação
+                    activeMedicationPrescriptions: JSON.parse(JSON.stringify(activePrescriptions)), // Copia profunda do estado CORRETO
                     evolution: patientData.lastEvolution || '',
                     pendingObs: patientData.lastPendingObs || '',
                     monitoring: lastHandoverWithMonitoring ? lastHandoverWithMonitoring.monitoring : {}
-
                 };
                 
-                // Limpa os arrays de estado de medicação antes de preencher
-                activePrescriptions = [];
-                administeredInShift = [];
-
-                // Carrega as prescrições ativas do paciente, convertendo timestamps do Firestore para objetos Date
-                if (patientData.activeMedicationPrescriptions) {
-                    activePrescriptions = patientData.activeMedicationPrescriptions.map(med => ({
-                        ...med,
-                        time: med.time.toDate ? med.time.toDate() : new Date(med.time)
-                    }));
-                }
+                // 3. RENDERIZA a lista de medicações na tela
+                renderMedicationLists();
 
                 // Preenche os detalhes do cabeçalho
                 patientDetailName.textContent = truncateNameByWords(patientData.name);
@@ -6964,8 +6891,306 @@
                         document.getElementById('allergy-input-container'),
                         document.getElementById('allergies-tags-container')
                     );
+                    
+                    const addHandoversForm = document.getElementById('add-handovers-form');
+                    if (addHandoversForm) {
+                        addHandoversForm.addEventListener('input', () => {
+                            setUnsavedChanges(true);
+                        });
+
+                        addHandoversForm.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') {
+                                const targetInput = e.target;
+                                const inputValue = targetInput.value.trim();
+                                // Lógica para alergias
+                                if (targetInput.id === 'form-allergies') {
+                                    e.preventDefault();
+                                    const moduleCard = targetInput.closest('#module-diagnostico');
+                                    if (inputValue) {
+                                        const container = document.getElementById('allergies-tags-container');
+                                        container.appendChild(createListItem(inputValue));
+                                        targetInput.value = '';
+                                        setUnsavedChanges(true);
+                                        updateDiagnosisSummary();
+                                        updateAllergyTitleVisibility();
+                                    } else {
+                                        targetInput.parentElement.classList.add('hidden');
+                                        if (moduleCard) {
+                                            exitEditMode(moduleCard);
+                                        }
+                                        updateAllergyTitleVisibility();
+                                    }
+                                    return;
+                                }
+
+                                const enterToAddTagMap = {
+                                    'form-comorbidities': { containerId: 'comorbidities-tags-container' },
+                                    'form-precaucoes': { containerId: 'precaucoes-container' },
+                                };
+
+                                const config = enterToAddTagMap[targetInput.id];
+
+                                if (config) {
+                                    e.preventDefault();
+                                    if (inputValue) {
+                                        const moduleCard = targetInput.closest('.bg-white.rounded-lg.shadow');
+                                        if (config.isDevice) {
+                                            addCustomDispositivo(inputValue, true);
+                                        } else {
+                                            const container = document.getElementById(config.containerId);
+                                            container.appendChild(createListItem(inputValue));
+                                        }
+                                        setUnsavedChanges(true);
+                                        if (config.containerId === 'comorbidities-tags-container' || config.containerId === 'diagnoses-tags-container') {
+                                            updateDiagnosisSummary();
+                                        }
+                                        if (moduleCard) {
+                                            const triggerWrapper = moduleCard.querySelector('.trigger-wrapper');
+                                            const cancelWrapper = moduleCard.querySelector('.cancel-action-wrapper');
+                                            const inputWrapper = moduleCard.querySelector('.input-wrapper');
+                                            triggerWrapper?.classList.remove('hidden');
+                                            cancelWrapper?.classList.add('hidden');
+                                            inputWrapper?.classList.add('hidden');
+                                            if(targetInput) targetInput.value = '';
+                                            exitEditMode(moduleCard);
+                                        }
+                                    }
+                                } else if (targetInput.tagName !== 'TEXTAREA') {
+                                    e.preventDefault();
+                                }
+                            }
+                        });
+                        addHandoversForm.addEventListener('submit', async (e) => {
+                            e.preventDefault();
+                            if (checkForInvalidInputs()) {
+                                showToast("Corrija os valores inválidos no monitoramento antes de salvar.", 3500);
+                                return;
+                            }
+
+                            const submitButton = e.target.querySelector('button[type="submit"]');
+                            submitButton.disabled = true;
+                            submitButton.innerHTML = `<div class="flex items-center justify-center">...Salvando...</div>`;
+
+                            try {
+                                const openModule = document.querySelector('.module-editing');
+                                if (openModule && openModule.id !== 'module-medicacoes' && openModule.id !== 'module-exames') {
+                                    exitEditMode(openModule);
+                                }
+
+                                const batch = writeBatch(db);
+                                const patientRef = doc(db, 'patients', currentPatientId);
+                                const newHandoverRef = doc(collection(patientRef, 'handovers'));
+                                const prescriptionsToSave = activePrescriptions.map(p => {
+                                    const cleanPrescription = { ...p };
+                                    if (p.time) cleanPrescription.time = Timestamp.fromDate(new Date(p.time));
+                                    if (p.startTime) cleanPrescription.startTime = Timestamp.fromDate(new Date(p.startTime));
+                                    return cleanPrescription;
+                                });
+                                const administeredToSaveForHistory = administeredInShift.map(p => ({ ...p }));
+
+                                const calculateMedicationChanges = (originalMeds = [], currentMeds = [], administeredMeds = []) => {
+                                    const originalMap = new Map(originalMeds.map(p => [p.prescriptionId, p]));
+                                    const currentMap = new Map(currentMeds.map(p => [p.prescriptionId, p]));
+
+                                    const changes = { administered: [], added: [], suspended: [], modified: [] };
+
+                                    administeredMeds.forEach(med => {
+                                        changes.administered.push({ name: med.name, dose: med.dose, time: med.time });
+                                    });
+
+                                    currentMap.forEach((med, id) => {
+                                        const originalMed = originalMap.get(id);
+                                        if (!originalMed) {
+                                            changes.added.push(med);
+                                        } else {
+                                            const originalSimple = { name: originalMed.name, dose: originalMed.dose, frequency: originalMed.frequency, duration: originalMed.duration };
+                                            const currentSimple = { name: med.name, dose: med.dose, frequency: med.frequency, duration: med.duration };
+                                            if (JSON.stringify(originalSimple) !== JSON.stringify(currentSimple)) {
+                                                changes.modified.push({ before: originalMed, after: med }); 
+                                            }
+                                        }
+                                    });
+
+                                    originalMap.forEach((med, id) => {
+                                        if (!currentMap.has(id)) {
+                                            changes.suspended.push(med);
+                                        }
+                                    });
+
+                                    return changes;
+                                };
+
+                                const medicationChanges = calculateMedicationChanges(
+                                    originalPatientState.activeMedicationPrescriptions,
+                                    activePrescriptions,
+                                    administeredInShift
+                                );
+
+                                const finalVitalsForSave = getFinalVitalsData();
+                                const news2Result = calculateNEWS2(finalVitalsForSave);
+                                const devicesToSave = Array.from(document.querySelectorAll('#dispositivos-grid input[type="checkbox"]:checked')).map(chk => chk.value);
+                                const fugulinResult = calculateFugulin({
+                                    news2: news2Result,
+                                    dispositivos: devicesToSave,
+                                    medicationsAdministered: administeredInShift,
+                                    consciencia: finalVitalsForSave.consciencia,
+                                    cuidadoCorporal: getFugulinScoreFromDOMorState('cuidadoCorporal'),
+                                    motilidade: getFugulinScoreFromDOMorState('motilidade'),
+                                    deambulacao: getFugulinScoreFromDOMorState('deambulacao'),
+                                    alimentacao: getFugulinScoreFromDOMorState('alimentacao'),
+                                    eliminacao: getFugulinScoreFromDOMorState('eliminacao')
+                                });
+
+                                const allergyRadioNo = document.getElementById('allergy-radio-no');
+                                let currentAllergies = allergyRadioNo && allergyRadioNo.checked ? [] : getItemsFromContainer('allergies-tags-container');
+                                const currentDiagnoses = getItemsFromContainer('diagnoses-tags-container');
+                                const currentComorbidities = getItemsFromContainer('comorbidities-tags-container');
+                                const currentPrecautions = getItemsFromContainer('precaucoes-container');
+                                const currentRisks = { lpp: getItemsFromContainer('riscos-lpp-container'), quedas: getItemsFromContainer('riscos-quedas-container'), bronco: getItemsFromContainer('riscos-bronco-container'), iras: getItemsFromContainer('riscos-iras-container') };
+                                const getFinalCareItem = (key) => {
+                                    const kebabKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+                                    const items = getItemsFromContainer(`fugulin-${kebabKey}-container`);
+                                    return items.length > 0 ? items : (originalPatientState.nursingCare?.[key] || []);
+                                };
+                                const nursingCareData = { cuidadoCorporal: getFinalCareItem('cuidadoCorporal'), motilidade: getFinalCareItem('motilidade'), deambulacao: getFinalCareItem('deambulacao'), alimentacao: getFinalCareItem('alimentacao'), eliminacao: getFinalCareItem('eliminacao') };
+                                const evolutionText = document.getElementById('form-evolution').value.trim();
+                                const pendingObsText = document.getElementById('form-pending-obs').value.trim();
+                                const monitoringDataForHistory = {};
+                                ['pa', 'fc', 'fr', 'sato2', 'temp', 'hgt', 'others'].forEach(key => {
+                                    const value = document.getElementById(`form-sv-${key}`).value.trim();
+                                    if (value) monitoringDataForHistory[key] = value;
+                                });
+                                monitoringDataForHistory.o2Supplement = document.getElementById('form-sv-o2').checked;
+                                const conscienciaTag = document.querySelector('#monitoring-consciencia-container .item-text');
+                                if (conscienciaTag) monitoringDataForHistory.consciencia = [conscienciaTag.dataset.value];
+                                const scheduledExamsToSave = patientExams.filter(e => e.status === 'scheduled');
+                                const pendingExamsToSave = patientExams.filter(e => e.status === 'pending');
+                                const completedExamsThisShift = [...currentShiftCompletedExams];
+
+                                const handoverData = {
+                                    professionalId: currentUser.uid, professionalName: currentUser.displayName,
+                                    timestamp: serverTimestamp(),
+                                    evolution: evolutionText,
+                                    pendingObs: pendingObsText,
+                                    monitoring: monitoringDataForHistory,
+                                    nursingCare: nursingCareData,
+                                    news2: news2Result,
+                                    fugulin: fugulinResult,
+                                    risks: currentRisks,
+                                    examsDone: completedExamsThisShift,
+                                    diagnoses: currentDiagnoses,
+                                    comorbidities: currentComorbidities,
+                                    allergies: currentAllergies,
+                                    precautions: currentPrecautions,
+                                    devices: devicesToSave,
+                                    scheduledExams: scheduledExamsToSave,
+                                    pendingExams: pendingExamsToSave,
+                                    rescheduledExams: currentShiftRescheduledExams,
+                                    medicationsAdministered: administeredToSaveForHistory,
+                                    changes: {
+                                        diagnoses: calculateDelta(originalPatientState.diagnoses, currentDiagnoses),
+                                        comorbidities: calculateDelta(originalPatientState.comorbidities, currentComorbidities),
+                                        allergies: calculateDelta(originalPatientState.allergies, currentAllergies),
+                                        precautions: calculateDelta(originalPatientState.precautions, currentPrecautions),
+                                        devices: calculateDelta(originalPatientState.devices, devicesToSave),
+                                        risks: {
+                                            lpp: calculateDelta(originalPatientState.risks.lpp, currentRisks.lpp),
+                                            quedas: calculateDelta(originalPatientState.risks.quedas, currentRisks.quedas),
+                                            bronco: calculateDelta(originalPatientState.risks.bronco, currentRisks.bronco),
+                                            iras: calculateDelta(originalPatientState.risks.iras, currentRisks.iras),
+                                        },
+                                        nursingCare: {
+                                            cuidadoCorporal: calculateDelta(originalPatientState.nursingCare.cuidadoCorporal, nursingCareData.cuidadoCorporal),
+                                            motilidade: calculateDelta(originalPatientState.nursingCare.motilidade, nursingCareData.motilidade),
+                                            deambulacao: calculateDelta(originalPatientState.nursingCare.deambulacao, nursingCareData.deambulacao),
+                                            alimentacao: calculateDelta(originalPatientState.nursingCare.alimentacao, nursingCareData.alimentacao),
+                                            eliminacao: calculateDelta(originalPatientState.nursingCare.eliminacao, nursingCareData.eliminacao),
+                                        },
+                                        fugulinScoreChange: (originalPatientState.lastFugulinScore !== fugulinResult.score) ? { from: originalPatientState.lastFugulinScore || 'N/A', to: fugulinResult.score } : null,
+                                        scheduledExams: calculateDeltaForExams(originalPatientState.scheduledExams, scheduledExamsToSave),
+                                        pendingExams: calculateDeltaForExams(originalPatientState.pendingExams, pendingExamsToSave),
+                                        medications: medicationChanges,
+                                    }
+                                };
+
+                                const patientUpdateData = {
+                                    lastUpdatedAt: serverTimestamp(),
+                                    lastProfessionalName: currentUser.displayName,
+                                    activeDiagnoses: currentDiagnoses,
+                                    activeComorbidities: currentComorbidities,
+                                    activeAllergies: currentAllergies,
+                                    activeDevices: devicesToSave,
+                                    activePrecautions: currentPrecautions,
+                                    activeRisks: currentRisks,
+                                    activeNursingCare: nursingCareData,
+                                    activeScheduledExams: scheduledExamsToSave,
+                                    activePendingExams: pendingExamsToSave,
+                                    lastNews2Score: news2Result.score,
+                                    lastNews2Level: news2Result.level,
+                                    lastFugulinScore: fugulinResult.score,
+                                    lastFugulinClassification: fugulinResult.classification,
+                                    activeMedicationPrescriptions: prescriptionsToSave,
+                                    lastEvolution: evolutionText,
+                                    lastPendingObs: pendingObsText,
+                                    completedExams: arrayUnion(...completedExamsThisShift)
+                                };
+
+                                batch.set(newHandoverRef, handoverData);
+                                batch.update(patientRef, patientUpdateData);
+                                await batch.commit();
+
+                                showToast("Passagem de plantão salva com sucesso!");
+                                currentPatientData = { ...currentPatientData, ...patientUpdateData };
+                                
+                                // Atualiza o estado original para o próximo ciclo
+                                originalPatientState = { ...originalPatientState, ...patientUpdateData, activeMedicationPrescriptions: JSON.parse(JSON.stringify(activePrescriptions)), monitoring: finalVitalsForSave, evolution: evolutionText, pendingObs: pendingObsText };
+
+                                const patientIndex = currentPatientList.findIndex(p => p.id === currentPatientId);
+                                if (patientIndex !== -1) {
+                                    currentPatientList[patientIndex] = { ...currentPatientList[patientIndex], ...patientUpdateData, lastUpdatedAt: Timestamp.now() };
+                                }
+
+                                const newHandoverForUI = { ...handoverData, id: newHandoverRef.id, timestamp: Timestamp.now() };
+                                currentHandovers.unshift(newHandoverForUI);
+                                
+                                const patientDetailNews2 = document.getElementById('patient-detail-news2');
+                                const patientDetailFugulin = document.getElementById('patient-detail-fugulin');
+
+                                if (patientUpdateData.lastNews2Score !== undefined && patientUpdateData.lastNews2Level) {
+                                    const news2Classes = { 'Risco Baixo': 'news2-low', 'Risco Baixo-Médio': 'news2-low-medium', 'Risco Médio': 'news2-medium', 'Risco Alto': 'news2-high' };
+                                    const badgeClass = news2Classes[patientUpdateData.lastNews2Level] || 'bg-gray-100 text-gray-800';
+                                    patientDetailNews2.innerHTML = `<span class="text-xs font-medium px-2.5 py-0.5 rounded-full ${badgeClass}">NEWS: ${patientUpdateData.lastNews2Score} - ${patientUpdateData.lastNews2Level}</span>`;
+                                }
+
+                                if (patientUpdateData.lastFugulinClassification) {
+                                    const fugulinClasses = { 'Cuidados Mínimos': 'fugulin-minimos', 'Cuidados Intermediários': 'fugulin-intermediarios', 'Cuidados de Alta Dependência': 'fugulin-alta-dependencia', 'Cuidados Semi-Intensivos': 'fugulin-semi-intensivos', 'Cuidados Intensivos': 'fugulin-intensivos' };
+                                    const badgeClass = fugulinClasses[patientUpdateData.lastFugulinClassification] || 'bg-gray-100 text-gray-800';
+                                    patientDetailFugulin.innerHTML = `<span class="status-badge text-xs font-medium px-2.5 py-0.5 rounded-full ${badgeClass}">Fugulin: ${patientUpdateData.lastFugulinScore} - ${patientUpdateData.lastFugulinClassification}</span>`;
+                                }
+
+                                renderHandoversList(currentHandovers);
+                                partiallyResetFormForNewShift();
+
+                            } catch (error) {
+                                console.error("Erro ao salvar passagem de plantão:", error);
+                                showToast(`Erro ao salvar: ${error.message}`, 'error');
+                            } finally {
+                                submitButton.disabled = false;
+                                submitButton.textContent = 'Salvar Passagem de Plantão';
+                                setUnsavedChanges(false);
+                            }
+                        });
+                        addHandoversForm.addEventListener('input', updateLiveScores);
+
+                        const o2Checkbox = document.getElementById('form-sv-o2');
+                        if (o2Checkbox) {
+                            o2Checkbox.addEventListener('change', updateLiveScores);
+                        }
+                    }
+                    
                     patientDetailListenersAttached = true;
                 }
+
                 updateAllergyPlaceholder();
                 resetMonitoringModule();
                 updateLiveScores();
@@ -7390,7 +7615,7 @@
         }
 
         /**
-         * NOVA FUNÇÃO DE IMPRESSÃO
+         * FUNÇÃO DE IMPRESSÃO
          * Coleta os dados do resumo semanal, converte o gráfico para imagem e monta um HTML para impressão.
          */
         async function handlePrintSummary() {
@@ -7402,7 +7627,6 @@
             
             showToast("Preparando impressão...", 2000);
 
-            // 1. RE-BUSCAR OS DADOS para garantir que a impressão é fiel ao que está no banco
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
             const handoversRef = collection(db, 'patients', currentPatientId, 'handovers');
@@ -7410,16 +7634,66 @@
             const snapshot = await getDocs(q);
             const recentHandovers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // 2. PROCESSAR OS DADOS (reutilizando as funções que já criamos)
             const kpis = processKPIs(recentHandovers);
             const events = processEventsForTable(recentHandovers.slice().reverse());
-            const chartImage = weeklySummaryChart.toBase64Image(); // Converte o gráfico em imagem!
+            const chartImage = weeklySummaryChart.toBase64Image();
 
-            // 3. COLETAR DADOS DO CABEÇALHO DO PACIENTE
+            // 1. Tabela de Medicações Administradas
+            const allAdministered = recentHandovers.flatMap(h => h.medicationsAdministered || []);
+            const administeredSummary = allAdministered.reduce((acc, med) => {
+                const key = `${med.name} ${formatDose(med.dose)}`.trim();
+                if (!acc[key]) {
+                    acc[key] = { count: 0, name: key };
+                }
+                acc[key].count++;
+                return acc;
+            }, {});
+            const sortedAdministered = Object.values(administeredSummary).sort((a, b) => b.count - a.count);
+            
+            let administeredHtml = '<tr><td colspan="2" style="text-align: center; padding: 10px; border: 1px solid #ddd;">Nenhuma medicação administrada na semana.</td></tr>';
+            if (sortedAdministered.length > 0) {
+                administeredHtml = sortedAdministered.map(med => `
+                    <tr style="page-break-inside: avoid;">
+                        <td style="border: 1px solid #ddd; padding: 4px;">${med.name}</td>
+                        <td style="border: 1px solid #ddd; padding: 4px; text-align: center;">${med.count}x</td>
+                    </tr>
+                `).join('');
+            }
+
+            // 2. Tabela de Alterações de Prescrição
+            let changesHtml = '';
+            recentHandovers.forEach(h => {
+                const medChanges = h.changes?.medications;
+                if (!medChanges) return;
+
+                const timestamp = h.timestamp.toDate().toLocaleString('pt-BR', {day: '2-digit', month: '2-digit'});
+
+                if (medChanges.added?.length > 0) {
+                    changesHtml += medChanges.added.map(m => `
+                        <tr style="page-break-inside: avoid;">
+                            <td style="border: 1px solid #ddd; padding: 4px;">[${timestamp}] <span style="color: #2563eb;">+</span> ${formatPrescriptionForHistory(m)}</td>
+                        </tr>`).join('');
+                }
+                if (medChanges.modified?.length > 0) {
+                    changesHtml += medChanges.modified.map(mod => `
+                        <tr style="page-break-inside: avoid;">
+                            <td style="border: 1px solid #ddd; padding: 4px;">[${timestamp}] <span style="color: #d97706;">🔄</span> ${formatPrescriptionForHistory(mod.after)} (Antes: ${mod.before.frequency}h/${mod.before.duration}d)</td>
+                        </tr>`).join('');
+                }
+                if (medChanges.suspended?.length > 0) {
+                    changesHtml += medChanges.suspended.map(m => `
+                        <tr style="page-break-inside: avoid;">
+                            <td style="border: 1px solid #ddd; padding: 4px;">[${timestamp}] <span style="color: #dc2626;">❌</span> Suspenso ${formatPrescriptionForHistory(m)}</td>
+                        </tr>`).join('');
+                }
+            });
+            if (changesHtml === '') {
+                changesHtml = '<tr><td style="text-align: center; padding: 10px; border: 1px solid #ddd;">Nenhuma alteração de prescrição na semana.</td></tr>';
+            }
+
             const { name, patientNumber, roomNumber, dob } = currentPatientData;
             const age = calculateAge(dob);
 
-            // 4. MONTAR O HTML PARA IMPRESSÃO (com estilos inline para garantir a formatação)
             printView.innerHTML = `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                     <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;">
@@ -7435,7 +7709,7 @@
                     <div style="margin-bottom: 20px; page-break-inside: avoid;">
                         <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Destaques da Semana</h3>
                         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                            <tbody>
+                           <tbody>
                                 <tr>
                                     <td style="border: 1px solid #ddd; padding: 5px;"><strong>Pico de FC:</strong> ${kpis.maxFC.value || 'N/A'} bpm</td>
                                     <td style="border: 1px solid #ddd; padding: 5px;"><strong>Menor PAS:</strong> ${kpis.minPAS.value || 'N/A'} mmHg</td>
@@ -7460,7 +7734,37 @@
                         <img src="${chartImage}" style="width: 100%; max-width: 100%; border: 1px solid #eee;" alt="Gráfico de Tendências"/>
                     </div>
 
-                    <div>
+                    <div style="margin-top: 25px; page-break-before: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Medicações Administradas</h3>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                <thead style="background-color: #f2f2f2; text-align: left;">
+                                    <tr>
+                                        <th style="border: 1px solid #ddd; padding: 5px;">Medicação</th>
+                                        <th style="border: 1px solid #ddd; padding: 5px; text-align: center; width: 80px;">Doses</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${administeredHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Alterações de Prescrição</h3>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                <thead style="background-color: #f2f2f2; text-align: left;">
+                                    <tr>
+                                        <th style="border: 1px solid #ddd; padding: 5px;">Evento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${changesHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 25px; page-break-before: auto;">
                         <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Linha do Tempo de Eventos Relevantes</h3>
                         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                             <thead style="background-color: #f2f2f2; text-align: left;">
@@ -7487,10 +7791,9 @@
                 </div>
             `;
 
-            // 5. Aciona a impressão do navegador
             setTimeout(() => {
                 window.print();
-            }, 200); // Um pequeno delay para garantir que a imagem do gráfico seja renderizada
+            }, 200);
         }
 
         /**
@@ -7649,16 +7952,28 @@
 
             // Seção: Medicações
             let medsHtml = '';
-            if (handover.medicationsAdministered?.length > 0) {
-                medsHtml += `<div class="summary-item"><span class="summary-item-label">Administradas no Plantão:</span><div class="summary-item-value"><ul>${handover.medicationsAdministered.map(m => `<li><strong>${m.name} ${m.dose}</strong> (às ${new Date(m.time).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})})</li>`).join('')}</ul></div></div>`;
-            }
-            if (handover.newlyPrescribed?.length > 0) {
-                medsHtml += `<div class="summary-item"><span class="summary-item-label">Novas Prescrições Iniciadas:</span><div class="summary-item-value"><ul>${handover.newlyPrescribed.map(m => `<li><strong>${m.name} ${m.dose}</strong></li>`).join('')}</ul></div></div>`;
+            const medChanges = handover.changes?.medications;
+            if (medChanges && (medChanges.administered?.length > 0 || medChanges.added?.length > 0 || medChanges.suspended?.length > 0 || medChanges.modified?.length > 0)) {
+                let log = '<ul>';
+                if (medChanges.administered?.length > 0) {
+                    log += medChanges.administered.map(m => `<li><span style="color: #16a34a;">✓</span> Administrou <strong>${m.name} ${m.dose}</strong></li>`).join('');
+                }
+                if (medChanges.added?.length > 0) {
+                    log += medChanges.added.map(m => `<li><span style="color: #2563eb;">+</span> Prescreveu ${formatPrescriptionForHistory(m)}</li>`).join('');
+                }
+                if (medChanges.suspended?.length > 0) {
+                    log += medChanges.suspended.map(m => `<li><span style="color: #dc2626;">❌</span> Suspendeu ${formatPrescriptionForHistory(m)}</li>`).join('');
+                }
+                if (medChanges.modified?.length > 0) {
+                    log += medChanges.modified.map(m => `<li><span style="color: #d97706;">🔄</span> Modificou prescrição de ${formatPrescriptionForHistory(m)}</li>`).join('');
+                }
+                log += '</ul>';
+                medsHtml = log;
             }
 
             contentHtml += `<div class="summary-section">
                 <h3 class="summary-section-header">💉 Medicações</h3>
-                ${medsHtml || '<span class="text-gray-500 text-xs italic">Nenhuma atividade de medicação registrada.</span>'}
+                ${medsHtml || '<span class="text-gray-500 text-xs italic">Nenhuma atividade de medicação registrada neste plantão.</span>'}
             </div>`;
 
             // Seção: Exames e Procedimentos
@@ -7819,7 +8134,6 @@
         };
 
         /**
-         * NOVA FUNÇÃO
          * Gera um HTML condensado e limpo de um handover para impressão.
          * @param {object} handover - O objeto de handover do Firestore.
          * @returns {string} - Uma string HTML formatada para impressão.
@@ -7833,7 +8147,6 @@
                 return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
             };
             
-            // Helper para criar uma seção de impressão apenas se houver conteúdo
             const renderPrintSection = (title, content) => {
                 if (!content || (typeof content === 'string' && content.trim() === '')) return '';
                 return `
@@ -7881,10 +8194,31 @@
             }
             html += renderPrintSection('Monitoramento e Scores', monitoringHtml);
 
-            // Seção: Medicações
-            if (handover.medications?.length > 0) {
-                const medsList = handover.medications.map(m => `<li><strong>${m.name}</strong> às ${m.times.map(ts => new Date(ts).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})).join(', ')}</li>`).join('');
-                html += renderPrintSection('Medicações do Plantão', `<ul>${medsList}</ul>`);
+            // Seção: Medicações Administradas
+            if (handover.medicationsAdministered?.length > 0) {
+                const medsList = handover.medicationsAdministered.map(m => {
+                    const time = m.time.toDate ? m.time.toDate() : new Date(m.time);
+                    const formattedTime = time.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                    return `<li>✓ <strong>${m.name} ${formatDose(m.dose)}</strong> às ${formattedTime}</li>`;
+                }).join('');
+                html += renderPrintSection('Medicações Administradas no Plantão', `<ul>${medsList}</ul>`);
+            }
+            
+            // Seção: Alterações de Prescrição
+            const medChanges = handover.changes?.medications;
+            if (medChanges && (medChanges.added?.length > 0 || medChanges.suspended?.length > 0 || medChanges.modified?.length > 0)) {
+                let log = '<ul>';
+                 if (medChanges.added?.length > 0) {
+                    log += medChanges.added.map(m => `<li><span style="color: #2563eb;">+</span> Iniciado ${formatPrescriptionForHistory(m)}</li>`).join('');
+                }
+                if (medChanges.suspended?.length > 0) {
+                    log += medChanges.suspended.map(m => `<li><span style="color: #dc2626;">❌</span> Suspenso ${formatPrescriptionForHistory(m)}</li>`).join('');
+                }
+                if (medChanges.modified?.length > 0) {
+                    log += medChanges.modified.map(m => `<li><span style="color: #d97706;">🔄</span> Modificado ${formatPrescriptionForHistory(m)}</li>`).join('');
+                }
+                log += '</ul>';
+                html += renderPrintSection('Alterações de Prescrição', log);
             }
             
             // Seção: Exames
@@ -7905,23 +8239,8 @@
             return html;
         }
         
-        /**
-         * NOVA FUNÇÃO AUXILIAR: Centraliza a lógica de fechar o editor de alergias.
-         * Esconde o campo de input e desativa o modo de edição do card principal.
-         */
-        function closeAllergyEditor() {
-            const allergyInputWrapper = document.getElementById('allergy-input-wrapper');
-            const moduleCard = document.getElementById('module-diagnostico');
 
-            if (allergyInputWrapper) {
-                allergyInputWrapper.classList.add('hidden');
-            }
-            if (moduleCard) {
-                exitEditMode(moduleCard);
-            }
-            // Atualiza a visibilidade do título ao fechar, garantindo consistência
-            updateAllergyTitleVisibility();
-        }
+        
         
         /**
          * Configura todas as interações e validações para o módulo de monitoramento.
@@ -8039,39 +8358,31 @@
             if (evolutionTextarea) evolutionTextarea.value = '';
             if (pendingObsTextarea) pendingObsTextarea.value = '';
 
-            // 2. Limpa o módulo de Medicações
-            const medicationsListContainer = document.getElementById('medications-list-container');
-            if (medicationsListContainer) medicationsListContainer.innerHTML = '';
-            currentMedications = []; // Limpa o array de estado das medicações
-            showMedicationEditor(false); // Garante que o editor de medicação esteja fechado
-            clearAllMonitoringValidationErrors();
-
-            // 3. Limpa o módulo de Monitoramento (reutilizando a função que já existe)
-            resetMonitoringModule();
+            // 2. Limpa APENAS os medicamentos administrados no turno
+            administeredInShift = [];
             
-            // 4. Limpa o estado de exames finalizados no plantão
+            // 3. Limpa os exames concluídos no turno
             currentShiftCompletedExams = [];
             currentShiftRescheduledExams = [];
 
-            // Limpa o módulo de Monitoramento (reutilizando a função que já existe)
-            // A função populateMonitoringModule(null) vai limpar todos os campos visuais e os inputs.
+            // 4. Limpa o módulo de Monitoramento
             populateMonitoringModule(null);
             
-            // Zera o estado das medicações e exames do turno
-            currentMedications = [];
-            currentShiftCompletedExams = [];
-            currentShiftRescheduledExams = [];
-
-            // Limpa a memória de monitoramento do estado de comparação
+            // 5. Re-renderiza as listas para refletir a limpeza
+            renderMedicationLists();
+            renderExams();
+            
+            // 6. Limpa a memória de monitoramento do estado de comparação
             if (originalPatientState && originalPatientState.monitoring) {
                 originalPatientState.monitoring = {};
             }
             
-            // Reseta o estado de "alterações não salvas" para desabilitar o botão de salvar
+            // 7. Reseta o estado de "alterações não salvas"
             setUnsavedChanges(false);
 
-            // Garante que o editor de exame esteja fechado
+            // 8. Garante que os editores estejam fechados
             resetAndCloseExamEditor();
+            resetAndCloseMedicationEditor();
         }
 
         /**
@@ -8521,62 +8832,54 @@
             const prescriptionId = medEditor.id.value;
             const isEditing = medEditor.mode.value === 'edit';
 
-            // Se estiver editando, remove todas as doses futuras da prescrição antiga
+            if (!name || !dose) {
+                showToast("Nome e dose da medicação são obrigatórios.", "error");
+                return;
+            }
+
+            // Se estiver editando, remove a prescrição antiga para ser substituída.
             if (isEditing) {
-                const now = new Date();
-                activePrescriptions = activePrescriptions.filter(d => 
-                    d.prescriptionId !== prescriptionId || d.time < now // Mantém as atrasadas
-                );
+                activePrescriptions = activePrescriptions.filter(p => p.prescriptionId !== prescriptionId);
             }
 
             // Lógica para Dose Única
-            if (medEditor.mode.value === 'schedule' || medEditor.mode.value === 'register' || (isEditing && prescriptionId.startsWith('single'))) {
+            if (medEditor.mode.value === 'schedule' || medEditor.mode.value === 'register') {
                 const date = parseBrazilianDateTime(medEditor.datetimeInput.value);
-                const newDose = {
-                    id: `med_${date.getTime()}`,
+                const newPrescription = {
+                    prescriptionId: isEditing ? prescriptionId : `single_${Date.now()}`,
+                    type: 'single',
                     name,
                     dose,
-                    time: date,
-                    // Define um ID diferente para doses "Registrar Agora"
-                    prescriptionId: isEditing ? prescriptionId : (medEditor.mode.value === 'register' ? `single_now_${Date.now()}` : `single_${Date.now()}`)
+                    time: date, // Salva como objeto Date
                 };
 
                 if (medEditor.mode.value === 'register') {
-                    administeredInShift.push(newDose);
-                } else { // schedule
-                    activePrescriptions.push(newDose);
+                    administeredInShift.push(newPrescription);
+                } else {
+                    activePrescriptions.push(newPrescription);
                 }
             }
-
             // Lógica para Uso Contínuo (Posologia)
-            if (!medSteps.step3b.classList.contains('hidden')) {
+            else if (!medSteps.step3b.classList.contains('hidden')) {
                 const startDate = parseBrazilianDateTime(medEditor.startTime.value);
                 const frequency = parseInt(medEditor.frequency.value, 10);
                 const duration = parseInt(medEditor.duration.value, 10);
-                const newPrescriptionId = isEditing ? prescriptionId : `cont_${Date.now()}`;
 
-                if (frequency > 0 && duration > 0) {
-                    for (let d = 0; d < duration; d++) {
-                        for (let h = 0; h < 24; h += frequency) {
-                            let doseTime = new Date(startDate);
-                            doseTime.setDate(startDate.getDate() + d);
-                            doseTime.setHours(startDate.getHours() + h);
-
-                            // Ao editar, só adiciona doses a partir de agora
-                            if (!isEditing || doseTime >= new Date()) {
-                                activePrescriptions.push({
-                                    id: `med_${doseTime.getTime()}`,
-                                    name,
-                                    dose,
-                                    time: doseTime,
-                                    prescriptionId: newPrescriptionId,
-                                    frequency: frequency, // Salva a frequência no objeto da dose
-                                    duration: duration // Salva a duração no objeto da dose
-                                });
-                            }
-                        }
-                    }
+                if (isNaN(frequency) || isNaN(duration) || frequency <= 0 || duration <= 0) {
+                     showToast("Frequência e duração devem ser números válidos.", "error");
+                     return;
                 }
+
+                const newPrescription = {
+                    prescriptionId: isEditing ? prescriptionId : `cont_${Date.now()}`,
+                    type: 'continuous',
+                    name,
+                    dose,
+                    startTime: startDate,
+                    frequency,
+                    duration,
+                };
+                activePrescriptions.push(newPrescription);
             }
 
             renderMedicationLists();
@@ -8590,81 +8893,59 @@
 
             const listItem = actionBtn.closest('.medication-list-item');
             const doseId = listItem.dataset.doseId;
+            const prescriptionId = listItem.dataset.prescriptionId;
             const action = actionBtn.dataset.action;
 
             if (action === 'administer') {
-                const doseToAdminister = activePrescriptions.find(d => d.id === doseId);
-                if (doseToAdminister) {
-                    // Preenche o modal de confirmação
-                    administerMedConfirmModal.querySelector('#administer-med-confirm-text strong').textContent = `${doseToAdminister.name} ${doseToAdminister.dose}`;
-                    confirmAdministerMedButton.dataset.doseId = doseId;
-                    administerMedConfirmModal.classList.remove('hidden');
-                }
+                openAdministerDoseEditor(doseId);
             }
 
             if (action === 'add-dose') {
-                const originalDose = administeredInShift.find(d => d.id === doseId);
-                if (originalDose) {
-                    const newDose = {
-                        ...originalDose, // Copia nome, dose, etc.
-                        id: `med_${Date.now()}`,
-                        time: new Date(), // Usa o horário atual
-                    };
-                    administeredInShift.push(newDose);
-                    renderMedicationLists();
-                    setUnsavedChanges(true);
-                    showToast(`Nova dose de ${newDose.name} registrada.`, 'success');
-                }
+                openAddDoseEditor(prescriptionId);
             }
 
             if (action === 'edit') {
-                const dose = activePrescriptions.find(d => d.id === doseId);
-                if (dose && dose.prescriptionId) {
-                    openMedicationEditorForEdit(dose.prescriptionId);
+                if (prescriptionId) {
+                    openMedicationEditorForEdit(prescriptionId);
                 }
             }
 
             if (action === 'delete') {
-                    const doseIndex = administeredInShift.findIndex(d => d.id === doseId);
-                    if (doseIndex > -1) {
-                        const [deletedDose] = administeredInShift.splice(doseIndex, 1);
+                const group = Object.values(administeredInShift.reduce((acc, dose) => {
+                    if (dose.prescriptionId === prescriptionId) {
+                        if (!acc[prescriptionId]) acc[prescriptionId] = { doses: [] };
+                        acc[prescriptionId].doses.push(dose);
+                    }
+                    return acc;
+                }, {}))[0];
 
-                        // Verifica se a dose veio de uma prescrição persistente (não de 'Registrar Agora')
-                        if (deletedDose.prescriptionId && !deletedDose.prescriptionId.startsWith('single_now')) {
-                            // Devolve para a lista de prescrições ativas
-                            activePrescriptions.push(deletedDose);
-                            showToast(`Administração de ${deletedDose.name} revertida.`, 'warning');
-                        } else {
+                if (group && group.doses.length > 0) {
+                    const lastDose = group.doses.sort((a, b) => b.time.getTime() - a.time.getTime())[0];
+                    
+                    const modal = document.getElementById('generic-confirm-modal');
+                    modal.querySelector('#generic-confirm-title').textContent = 'Excluir Registro de Dose';
+                    modal.querySelector('#generic-confirm-text').textContent = `Tem certeza que deseja excluir o último registro de ${lastDose.name}? Esta ação não pode ser desfeita.`;
+                    modal.querySelector('#generic-confirm-button').textContent = 'Sim, Excluir';
+                    
+                    const confirmBtn = modal.querySelector('#generic-confirm-button');
+                    const newConfirmBtn = confirmBtn.cloneNode(true);
+                    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+                    newConfirmBtn.addEventListener('click', () => {
+                        const doseIndex = administeredInShift.findIndex(d => d.id === lastDose.id);
+                        if (doseIndex > -1) {
+                            const [deletedDose] = administeredInShift.splice(doseIndex, 1);
+                            renderMedicationLists();
+                            setUnsavedChanges(true);
                             showToast(`Registro de ${deletedDose.name} removido.`, 'success');
                         }
+                        modal.classList.add('hidden');
+                    }, { once: true });
 
-                        renderMedicationLists();
-                        setUnsavedChanges(true);
-                    }
+                    modal.querySelector('#generic-cancel-button').onclick = () => modal.classList.add('hidden');
+                    modal.classList.remove('hidden');
                 }
-        });
-
-        // Botões do modal de confirmação de administração de medicação
-        cancelAdministerMedButton.addEventListener('click', () => {
-            administerMedConfirmModal.classList.add('hidden');
-        });
-
-        confirmAdministerMedButton.addEventListener('click', () => {
-            const doseId = confirmAdministerMedButton.dataset.doseId;
-            const doseIndex = activePrescriptions.findIndex(d => d.id === doseId);
-
-            if (doseIndex > -1) {
-                // Remove a dose da lista de ativas e a adiciona na lista de administradas
-                const [administeredDose] = activePrescriptions.splice(doseIndex, 1);
-                administeredDose.time = new Date(); // Atualiza para o horário exato da administração
-                administeredInShift.push(administeredDose);
-
-                renderMedicationLists();
-                setUnsavedChanges(true);
-                showToast(`${administeredDose.name} administrado com sucesso!`, 'success');
             }
-
-            administerMedConfirmModal.classList.add('hidden');
         });
 
         // Fecha o painel se clicar em qualquer outro lugar
