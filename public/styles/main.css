@@ -233,7 +233,6 @@
             flex-grow: 1; /* Faz a lista crescer para preencher o espaço vertical disponível */
             overflow-y: auto; /* Agora a rolagem funcionará corretamente */
             padding-right: 4px; /* Espaço para a barra de rolagem não colar no texto */
-            /* A propriedade 'height' foi removida */
             height: 150px; 
 
         }
@@ -271,9 +270,6 @@
         #module-medicacoes {
             display: flex;
             flex-direction: column;
-            min-height: 120px; /* Altura mínima para mostrar o botão "+ Nova Medicação" */
-            max-height: 220px; /* Metade da altura anterior, para a lista */
-            transition: all 0.3s ease-in-out; /* Suaviza a mudança de tamanho */
             position: relative;
         }
 
@@ -560,15 +556,6 @@
             height: 100%; /* Faz o card tentar ocupar toda a altura da célula do grid */
         }
 
-
-
-        /* 3. Modifica o módulo de Medicações para remover as restrições de altura */
-        #module-medicacoes {
-            /* Remove as alturas mínimas e máximas para permitir o crescimento dinâmico */
-            min-height: initial; 
-            max-height: initial;
-        }
-
         /* Garante que o conteúdo interno dos módulos de Exames e Medicações cresça */
         #exam-lists-container,
         #medications-list-container {
@@ -580,7 +567,7 @@
             display: flex;
             align-items: center;
             justify-content: flex-start; /* Alinha o conteúdo à esquerda */
-            padding: 0.70rem; /* p-3 */
+            padding: 0.4rem;
             border: 2px dashed #e5e7eb; /* border-2 border-dashed border-gray-200 */
             border-radius: 0.5rem; /* rounded-lg */
             transition: all 0.2s ease-in-out;
@@ -1062,12 +1049,6 @@
             display: none;
         }
 
-        /* Estilo para destacar card de paciente com medicação atrasada */
-        .patient-card.overdue-medication, .patient-list-item.overdue-medication {
-            background-color: #fee2e2; /* bg-red-100 */
-            border-color: #fca5a5; /* border-red-300 */
-        }
-
         /* Estilos para o painel de medicações da unidade */
         #unit-medications-content .medication-patient-card {
             background-color: #f9fafb; /* bg-gray-50 */
@@ -1090,26 +1071,16 @@
             font-weight: 600; /* font-semibold */
         }
 
-        /* Cor do ícone de sino de medicação quando há atrasos */
-        #show-unit-medications-button.has-overdue {
-            color: #dc2626; /* text-red-600 */
-        }
-
-        #module-medicacoes {
-            display: flex;
-            flex-direction: column;
-            height: 400px; /* Define uma altura fixa para permitir a rolagem interna */
-        }
-
         .medication-list {
             flex-grow: 1;
             background-color: #f9fafb; /* bg-gray-50 */
             border-radius: 0.375rem; /* rounded-md */
             padding: 0.5rem;
-            overflow-y: auto;
-            display: flex; /* Adicionado para usar gap */
-            flex-direction: column; /* Adicionado para usar gap */
-            gap: 0.5rem; /* Adiciona espaçamento entre os itens da lista */
+            overflow-y: auto; /* Ativa a barra de rolagem quando o conteúdo exceder a altura */
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            height: 150px; /* Define uma altura fixa para a lista, forçando a rolagem interna */
         }
 
         .medication-grid-container {
@@ -1133,13 +1104,6 @@
             padding-bottom: 0.25rem;
         }
 
-        .medication-list {
-            flex-grow: 1;
-            background-color: #f9fafb; /* bg-gray-50 */
-            border-radius: 0.375rem; /* rounded-md */
-            padding: 0.5rem;
-            overflow-y: auto;
-        }
 
         .medication-list-item {
             background-color: #ffffff;
@@ -1200,6 +1164,87 @@
 
         .med-action-btn:hover {
             background-color: #f3f4f6; /* bg-gray-100 */
+        }
+
+        .med-info-icon {
+            font-size: 0.75rem; /* text-xs */
+            color: #6b7280; /* text-gray-500 */
+            font-style: italic;
+            cursor: help; /* Muda o cursor para indicar que há um tooltip */
+        }
+
+        /* Transforma o item principal de medicação em um flex container */
+        .medication-list-item {
+            display: flex;
+            justify-content: space-between; /* Espaça a informação e os botões */
+            align-items: flex-start; /* Alinha os itens no topo */
+        }
+
+        /* Container para as informações da medicação (nome, dose, etc) */
+        .med-info-container {
+            display: flex;
+            flex-direction: column; /* Coloca cada <p> em uma nova linha */
+            gap: 0.1rem; /* Pequeno espaço entre as linhas de texto */
+            flex-grow: 1; /* Permite que este container ocupe o espaço disponível */
+            min-width: 0; /* Previne que o texto empurre os botões para fora */
+        }
+
+        /* Garante que o nome possa ser quebrado se for muito longo */
+        .medication-list-item-name {
+            word-break: break-word;
+        }
+
+        .medication-list-item-freq {
+            margin-top: -2px; /* Puxa a linha de frequência um pouco para cima, reduzindo o espaçamento */
+            line-height: 1; /* Garante que a altura da linha seja compacta */
+        }
+
+        /* Container para os botões de ação */
+        .medication-list-item-actions {
+            flex-shrink: 0; /* Impede que os botões encolham */
+            margin-left: 0.5rem; /* ml-2 */
+            display: flex;
+            gap: 0.25rem; /* space-x-1 */
+        }
+
+        /* Transforma o item principal de exame em um flex container */
+        .exam-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            background-color: white;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            font-size: 0.875rem;
+        }
+
+        /* Container para as informações do exame */
+        .exam-info-container {
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        /* Container para as ações do exame */
+        .exam-actions-container {
+            flex-shrink: 0;
+            margin-left: 0.5rem;
+            display: flex;
+            gap: 0.5rem; /* space-x-2 */
+        }
+
+        /* Estiliza a lista de horários dentro do card de medicação */
+        .medication-list-item-times-administered {
+            font-size: 0.75rem; /* text-xs */
+            color: #4b5563; /* text-gray-600 */
+            margin-top: 2px;
+            line-height: 1.2;
+        }
+
+        /* Impede que o horário e a data quebrem para a linha seguinte, a menos que seja necessário */
+        .med-time-wrapper {
+            white-space: nowrap;
         }
 
         @keyframes sound-wave-animation {
